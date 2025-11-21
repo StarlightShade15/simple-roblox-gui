@@ -632,7 +632,10 @@ function ExoUI:Init(Title)
     
     MinimizeButton.MouseButton1Click:Connect(function()
         -- Toggle the visibility of the MainFrame
-        MainFrame.Visible = not MainFrame.Visible
+        -- This ensures the button can hide AND show the UI.
+        if MainFrame and MainFrame.Parent then
+            MainFrame.Visible = not MainFrame.Visible
+        end
     end)
     
     -- === 2. Close/Rejoin Button (X) ===
@@ -654,13 +657,19 @@ function ExoUI:Init(Title)
     })
     
     CloseButton.MouseButton1Click:Connect(function()
-        -- 1. Destroy the entire ScreenGui artifact
-        if ScreenGui then
-            ScreenGui:Destroy()
+        -- Only attempt to rejoin if the UI is currently visible (acting as the "Close" action)
+        if MainFrame.Visible then
+            -- 1. Destroy the entire ScreenGui artifact
+            if ScreenGui then
+                ScreenGui:Destroy()
+            end
+            
+            -- 2. Attempt to rejoin the current game instance
+            TeleportService:Teleport(game.PlaceId)
+        else
+            -- If it's not visible, treat the X as a general 'show' toggle, similar to the Minimize button
+            MainFrame.Visible = true
         end
-        
-        -- 2. Attempt to rejoin the current game instance
-        TeleportService:Teleport(game.PlaceId)
     end)
 
     -- === 3. Keybind Toggle (M Key) ===
