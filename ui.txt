@@ -7,6 +7,8 @@
     - Tab and Checkbox control creation.
     - Toast notifications.
     - Blur effect toggle.
+    
+    FIX: Added RunService.Heartbeat:Wait() in updateCanvasSize to fix controls not appearing.
 ]]
 
 local player = game.Players.LocalPlayer
@@ -100,6 +102,10 @@ local function updateCanvasSize(content)
     -- This ensures the scrolling frame content fits the controls
     local listLayout = content:FindFirstChildOfClass("UIListLayout")
     if listLayout then
+        -- FIX: Wait one frame to allow the UIListLayout to process the new child and update AbsoluteContentSize
+        -- This is crucial to fix the issue where controls don't appear.
+        RunService.Heartbeat:Wait()
+        
         -- Calculate total height needed for children and padding
         local totalHeight = listLayout.AbsoluteContentSize.Y
         -- Calculate visible height of the ScrollingFrame
