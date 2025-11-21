@@ -429,12 +429,13 @@ local function _CreateDropdown(ParentFrame, controlName, options, defaultValue, 
     local closeConnection = UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
         if not gameProcessedEvent and OptionsContainer.Visible then
             local mousePos = Vector2.new(input.Position.X, input.Position.Y)
-            -- Simple check if the click is outside
-            local isOverButton = DropdownButton:GetAbsolutePosition().X <= mousePos.X and mousePos.X <= DropdownButton:GetAbsolutePosition().X + DropdownButton.AbsoluteSize.X and
-                                 DropdownButton:GetAbsolutePosition().Y <= mousePos.Y and mousePos.Y <= DropdownButton:GetAbsolutePosition().Y + DropdownButton.AbsoluteSize.Y
             
-            local isOverOptions = OptionsContainer:GetAbsolutePosition().X <= mousePos.X and mousePos.X <= OptionsContainer:GetAbsolutePosition().X + OptionsContainer.AbsoluteSize.X and
-                                  OptionsContainer:GetAbsolutePosition().Y <= mousePos.Y and mousePos.Y <= OptionsContainer:GetAbsolutePosition().Y + OptionsContainer.AbsoluteSize.Y
+            -- FIX: Changed :GetAbsolutePosition() to .AbsolutePosition
+            local isOverButton = DropdownButton.AbsolutePosition.X <= mousePos.X and mousePos.X <= DropdownButton.AbsolutePosition.X + DropdownButton.AbsoluteSize.X and
+                                 DropdownButton.AbsolutePosition.Y <= mousePos.Y and mousePos.Y <= DropdownButton.AbsolutePosition.Y + DropdownButton.AbsoluteSize.Y
+            
+            local isOverOptions = OptionsContainer.AbsolutePosition.X <= mousePos.X and mousePos.X <= OptionsContainer.AbsolutePosition.X + OptionsContainer.AbsoluteSize.X and
+                                  OptionsContainer.AbsolutePosition.Y <= mousePos.Y and mousePos.Y <= OptionsContainer.AbsolutePosition.Y + OptionsContainer.AbsoluteSize.Y
 
             if not isOverButton and not isOverOptions then
                 OptionsContainer.Visible = false
@@ -667,7 +668,7 @@ function ExoUI:Init(Title)
             -- 2. Attempt to rejoin the current game instance
             TeleportService:Teleport(game.PlaceId)
         else
-            -- If it's not visible, treat the X as a general 'show' toggle, similar to the Minimize button
+            -- If it's not visible, treat the X as a general 'show' toggle
             MainFrame.Visible = true
         end
     end)
