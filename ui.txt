@@ -330,17 +330,18 @@ local function _CreateDropdown(ParentFrame, controlName, options, defaultValue, 
     
     -- Options Container setup function
     local function createOptionsContainer()
-        -- FIX 1: Set a non-zero size initially, matching the button width, so UILayout can calculate
+        -- FIX 1: Set size to match the button width (Scale=0, Offset=0 initially, will be updated)
         OptionsContainer = Create("Frame", {
             Name = "DropdownOptionsContainer",
-            Size = UDim2.new(0, DropdownButton.AbsoluteSize.X, 0, 0), -- Use calculated button width
+            -- Size will be dynamically updated based on the button width and content height
+            Size = UDim2.new(0, 0, 0, 0), 
             Position = UDim2.new(0, 0, 0, 0),
             AnchorPoint = Vector2.new(0, 0),
             BackgroundColor3 = Config.PrimaryColor,
             BorderSizePixel = 0,
             Visible = false,
             ZIndex = 5, 
-            ClipsDescendants = true, -- Add this to ensure contents are clipped if layout is buggy
+            ClipsDescendants = true,
             Parent = ScreenGui -- <-- **Parented to ScreenGui for overlay**
         })
         
@@ -376,10 +377,10 @@ local function _CreateDropdown(ParentFrame, controlName, options, defaultValue, 
                 Font = Config.Font,
                 TextSize = 14,
                 BorderSizePixel = 0,
-                TextXAlignment = Enum.TextXAlignment.Left, -- FIX 2: Ensure text is aligned left
+                TextXAlignment = Enum.TextXAlignment.Left,
                 TextScaled = false,
                 TextWrapped = true,
-                TextPadding = Insets.new(5, 0, 5, 0), -- Add some padding on the left
+                TextPadding = Insets.new(5, 0, 5, 0),
                 Parent = OptionsContainer
             })
             
@@ -392,20 +393,26 @@ local function _CreateDropdown(ParentFrame, controlName, options, defaultValue, 
             end)
         end
         
-        -- Wait for the UIListLayout to calculate its size, then update container height
+        -- The layout needs to update the container size after children are added
         OptionsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            -- Set size to button width and calculated content height
-            OptionsContainer.Size = UDim2.new(0, DropdownButton.AbsoluteSize.X, 0, OptionsLayout.AbsoluteContentSize.Y)
+            -- We don't change size here, only when toggling visibility
         end)
         
         -- Destroy the detached container if the control is removed
         ControlFrame.AncestryChanged:Connect(function()
-            if not ControlFrame.Parent then
+            if not ControlFrame.Parent and OptionsContainer then
                 OptionsContainer:Destroy()
             end
         end)
 
         return OptionsLayout
+    end
+    
+    -- Ensure ScreenGui exists before creating the options container
+    if not ScreenGui then
+        -- This should ideally be handled by ExoUI:Init, but as a safeguard:
+        warn("ExoUI not initialized! Cannot create dropdown options container.")
+        return ControlFrame
     end
     
     local OptionsLayout = createOptionsContainer()
@@ -427,8 +434,9 @@ local function _CreateDropdown(ParentFrame, controlName, options, defaultValue, 
             local absPos = DropdownButton.AbsolutePosition
             local absSize = DropdownButton.AbsoluteSize
             
-            -- Update Size and Position on visibility toggle, AFTER layout has settled
+            -- FIX 2: Correctly update Size and Position of the detached container
             OptionsContainer.Size = UDim2.new(0, absSize.X, 0, OptionsLayout.AbsoluteContentSize.Y)
+            -- Position below the button
             OptionsContainer.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 1)
         end
     end
@@ -438,11 +446,13 @@ local function _CreateDropdown(ParentFrame, controlName, options, defaultValue, 
         if not gameProcessedEvent and OptionsContainer.Visible then
             local mousePos = Vector2.new(input.Position.X, input.Position.Y)
             
-            local isOverButton = DropdownButton.AbsolutePosition.X <= mousePos.X and mousePos.X <= DropdownButton.AbsolutePosition.X + DropdownButton.AbsoluteSize.X and
-                                 DropdownButton.AbsolutePosition.Y <= mousePos.Y and mousePos.Y <= DropdownButton.AbsolutePosition.Y + DropdownButton.AbsoluteSize.Y
+            -- Check if click is outside the button and outside the options container
             
-            local isOverOptions = OptionsContainer.AbsolutePosition.X <= mousePos.X and mousePos.X <= OptionsContainer.AbsolutePosition.X + OptionsContainer.AbsoluteSize.X and
-                                  OptionsContainer.AbsolutePosition.Y <= mousePos.Y and mousePos.Y <= OptionsContainer.AbsolutePosition.Y + OptionsContainer.AbsoluteSize.Y
+            local isOverButton = mousePos.X >= DropdownButton.AbsolutePosition.X and mousePos.X <= DropdownButton.AbsolutePosition.X + DropdownButton.AbsoluteSize.X and
+                                 mousePos.Y >= DropdownButton.AbsolutePosition.Y and mousePos.Y <= DropdownButton.AbsolutePosition.Y + DropdownButton.AbsoluteSize.Y
+            
+            local isOverOptions = mousePos.X >= OptionsContainer.AbsolutePosition.X and mousePos.X <= OptionsContainer.AbsolutePosition.X + OptionsContainer.AbsoluteSize.X and
+                                  mousePos.Y >= OptionsContainer.AbsolutePosition.Y and mousePos.Y <= OptionsContainer.AbsolutePosition.Y + OptionsContainer.AbsoluteSize.Y
 
             if not isOverButton and not isOverOptions then
                 OptionsContainer.Visible = false
@@ -824,7 +834,7 @@ function ExoUI:CreateTab(Name, IsDefault)
             if ScreenGui then
                 for _, child in ipairs(ScreenGui:GetChildren()) do
                     if child.Name == "DropdownOptionsContainer" then
-                        child:Destroy()
+                        child.Visible = false -- Just hide, don't destroy, as it will be reused
                     end
                 end
             end
