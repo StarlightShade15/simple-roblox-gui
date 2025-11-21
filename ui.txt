@@ -1,6 +1,6 @@
 -- This is the complete, self-contained, image-free library code.
--- This version adds the Close (X) and Minimize (-) buttons to the header,
--- and implements the RightShift keybind to toggle the menu visibility.
+-- This version fixes the layout issue in the header so the Close (X) and Minimize (-) buttons are visible.
+-- It also includes the RightShift keybind to toggle the menu visibility.
 
 -- Core Roblox Services
 local Players = game:GetService("Players")
@@ -88,7 +88,7 @@ function ExoUI:Init(Title)
     local ControlsContainer = Create("Frame", {
         Name = "ControlsContainer",
         Size = UDim2.new(0, 70, 1, 0), -- Enough width for two buttons + padding
-        Position = UDim2.new(1, -70, 0, 0),
+        Position = UDim2.new(1, -Config.Padding, 0, 0), -- Positioned 10px from the right edge
         BackgroundTransparency = 1,
         Parent = HeaderFrame
     })
@@ -97,16 +97,17 @@ function ExoUI:Init(Title)
     Create("UIListLayout", {
         Name = "ControlsLayout",
         FillDirection = Enum.FillDirection.Horizontal,
-        HorizontalAlignment = Enum.HorizontalAlignment.Right,
+        HorizontalAlignment = Enum.HorizontalAlignment.Right, -- Align contents to the right
         VerticalAlignment = Enum.VerticalAlignment.Center,
         Padding = UDim.new(0, 5),
         Parent = ControlsContainer
     })
     
     -- Header Text (adjusted size to make space for control buttons)
+    -- Total width needed: 10px left padding + 70px controls = 80px space needed on the right.
     Create("TextLabel", {
         Name = "TitleLabel",
-        Size = UDim2.new(1, -75, 1, 0), -- Adjusted width
+        Size = UDim2.new(1, -85, 1, 0), -- Adjusted width: 100% width minus 85 pixels.
         Position = UDim2.new(0, Config.Padding, 0, 0),
         Text = Title or "ExoUI",
         Font = Config.Font,
@@ -443,11 +444,6 @@ function ExoUI:CreateTab(Name, IsDefault)
     ExoUI.Tabs[Name] = tabTable
     return tabTable
 end
-
--- =================================================================
--- Control Creation Methods
--- =================================================================
-ExoUI.Controls = {}
 
 -- 3. Checkbox
 function ExoUI.Controls:_CreateCheckbox(ParentFrame, controlName, defaultValue, callback)
