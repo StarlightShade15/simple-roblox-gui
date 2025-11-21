@@ -1,14 +1,14 @@
 --[[
-    ExoUI Library - A single-file, loadstring-compatible UI Framework for Roblox.
-    Features:
-    - Initialization function: ExoUI:Init(title)
-    - NEW: ExoUI:CreateTab(tabName, isDefault) can be called after Init().
-    - Draggable Main Window.
-    - Close (X) and Minimize (-) buttons.
-    - RightShift keybind to toggle visibility.
-    - Dynamic Theme Switcher (Dark, Light, Blue Night).
-    - Tab System (Combat, Visual).
---]]
+    ExoUI Library: Core Framework Module
+    
+    This file defines the ExoUI library, including the main window scaffolding,
+    theme management, and the ExoUI:CreateTab method for dynamic feature tabs.
+    
+    The Init function creates the ScreenGui, MainWindow, TitleBar, and the
+    empty TabContainer and ContentFrame.
+    
+    The ExoUI table is returned at the end, ready to be 'required' by a loader script.
+]]
 
 local ExoUI = {}
 
@@ -24,74 +24,68 @@ local CurrentTheme = "Dark"
 -- Color Palettes for themes
 local Themes = {
     Dark = {
-        PrimaryBg = Color3.fromRGB(32, 32, 32),    -- Main background
-        SecondaryBg = Color3.fromRGB(40, 40, 40),  -- Tab/Settings panel background
-        AccentColor = Color3.fromRGB(150, 10, 255),-- Accent for selection/border
-        TitleText = Color3.fromRGB(255, 255, 255), -- White
+        PrimaryBg = Color3.fromRGB(32, 32, 32),
+        SecondaryBg = Color3.fromRGB(40, 40, 40),
+        AccentColor = Color3.fromRGB(150, 10, 255),
+        TitleText = Color3.fromRGB(255, 255, 255),
         ContentText = Color3.fromRGB(200, 200, 200),
     },
     Light = {
         PrimaryBg = Color3.fromRGB(240, 240, 240),
         SecondaryBg = Color3.fromRGB(255, 255, 255),
-        AccentColor = Color3.fromRGB(30, 144, 255), -- Dodger Blue
+        AccentColor = Color3.fromRGB(30, 144, 255),
         TitleText = Color3.fromRGB(0, 0, 0),
         ContentText = Color3.fromRGB(50, 50, 50),
     },
     BlueNight = {
-        PrimaryBg = Color3.fromRGB(26, 43, 60),    -- Dark Slate Blue
+        PrimaryBg = Color3.fromRGB(26, 43, 60),
         SecondaryBg = Color3.fromRGB(37, 58, 80),
-        AccentColor = Color3.fromRGB(0, 191, 255), -- Deep Sky Blue
+        AccentColor = Color3.fromRGB(0, 191, 255),
         TitleText = Color3.fromRGB(230, 240, 255),
         ContentText = Color3.fromRGB(180, 200, 220),
     }
 }
 
 --***********************************************************************
---** UI Creation Functions
+--** Theme Management
 --***********************************************************************
 
 local function ApplyTheme(themeName)
     local theme = Themes[themeName]
     if not theme then return end
 
-    -- Update the Main Window
     if MainWindow then
         MainWindow.BackgroundColor3 = theme.PrimaryBg
         MainWindow:FindFirstChild("TitleBar").BackgroundColor3 = theme.SecondaryBg
         MainWindow:FindFirstChild("TitleBar"):FindFirstChild("TitleLabel").TextColor3 = theme.TitleText
         
-        -- Apply to Settings/Tabs Container
         local TabContainer = MainWindow:FindFirstChild("TabContainer")
         if TabContainer then
             TabContainer.BackgroundColor3 = theme.SecondaryBg
             
-            -- Update tab buttons
+            -- Update tab buttons and accent
+            local ActiveTabValue = MainWindow.ActiveTab.Value
             for _, btn in TabContainer:FindFirstChild("Tabs"):GetChildren() do
                 if btn:IsA("TextButton") then
                     btn.TextColor3 = theme.ContentText
-                    -- Update accent on selected tab
-                    if MainWindow.ActiveTab and btn.Name == MainWindow.ActiveTab.Value then
+                    if btn.Name == ActiveTabValue then
                         btn.UIStroke.Color = theme.AccentColor
+                        btn.UIStroke.Thickness = 2
                     else
-                        btn.UIStroke.Color = theme.SecondaryBg
+                        btn.UIStroke.Thickness = 0
                     end
                 end
             end
         end
         
-        -- Apply to the Content Frame
         local ContentFrame = MainWindow:FindFirstChild("ContentFrame")
         if ContentFrame then
             ContentFrame.BackgroundColor3 = theme.PrimaryBg
         end
         
-        -- Apply to settings button
+        -- Update controls
         local SettingsButton = MainWindow:FindFirstChild("TitleBar"):FindFirstChild("SettingsButton")
-        if SettingsButton then
-            SettingsButton.ImageColor3 = theme.AccentColor
-        end
-        
-        -- Apply to Control buttons (X, -)
+        if SettingsButton then SettingsButton.ImageColor3 = theme.AccentColor end
         local Controls = MainWindow:FindFirstChild("TitleBar"):FindFirstChild("Controls")
         if Controls then
             Controls:FindFirstChild("CloseButton").TextColor3 = theme.ContentText
@@ -118,7 +112,7 @@ local function CreateThemeOption(parent, themeName)
     corner.Parent = button
     
     local stroke = Instance.new("UIStroke")
-    stroke.Thickness = 1
+    stroke.Thickness = (themeName == CurrentTheme) and 2 or 1
     stroke.Color = theme.AccentColor
     stroke.Parent = button
 
@@ -126,7 +120,9 @@ local function CreateThemeOption(parent, themeName)
         stroke.Thickness = 2
     end)
     button.MouseLeave:Connect(function()
-        stroke.Thickness = 1
+        if CurrentTheme ~= themeName then
+            stroke.Thickness = 1
+        end
     end)
     
     button.MouseButton1Click:Connect(function()
@@ -134,108 +130,11 @@ local function CreateThemeOption(parent, themeName)
     end)
 end
 
--- New public method for creating tabs
-function ExoUI:CreateTab(tabName, isDefault)
-    if not MainWindow or not MainWindow:FindFirstChild("TabContainer") then
-        error("ExoUI:CreateTab called before Init() or MainWindow not found.")
-        return nil
-    end
-
-    local TabsFrame = MainWindow:FindFirstChild("TabContainer"):FindFirstChild("Tabs")
-    local ContentFrame = MainWindow:FindFirstChild("ContentFrame")
-    local ActiveTab = MainWindow.ActiveTab
-    
-    local tabButton = Instance.new("TextButton")
-    tabButton.Name = tabName
-    tabButton.Text = tabName
-    tabButton.Size = UDim2.new(1, 0, 0, 40)
-    tabButton.BackgroundColor3 = Themes[CurrentTheme].SecondaryBg
-    tabButton.TextColor3 = Themes[CurrentTheme].ContentText
-    tabButton.Font = Enum.Font.SourceSansBold
-    tabButton.TextSize = 16
-    tabButton.Parent = TabsFrame
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim2.new(0, 4)
-    corner.Parent = tabButton
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Thickness = isDefault and 2 or 0
-    stroke.Color = Themes[CurrentTheme].AccentColor
-    stroke.Parent = tabButton
-
-    local padding = Instance.new("UIPadding")
-    padding.PaddingTop = UDim.new(0.05, 0)
-    padding.PaddingBottom = UDim.new(0.05, 0)
-    padding.Parent = tabButton
-
-    local contentFrame = Instance.new("Frame")
-    contentFrame.Name = tabName .. "Content"
-    contentFrame.Size = UDim2.new(1, 0, 1, 0)
-    contentFrame.BackgroundTransparency = 1
-    contentFrame.Parent = ContentFrame
-    
-    -- Set visibility based on if it's the default tab
-    contentFrame.Visible = isDefault or (not ActiveTab.Value and tabName == "Combat") -- Fallback to Combat if ActiveTab is not set
-
-    if isDefault then
-        ActiveTab.Value = tabName
-    end
-    
-    -- Example content for the tab
-    local label = Instance.new("TextLabel")
-    label.Text = tabName .. " Tab Content"
-    label.TextColor3 = Themes[CurrentTheme].ContentText
-    label.BackgroundTransparency = 1
-    label.Size = UDim2.new(1, 0, 0, 30)
-    label.Position = UDim2.new(0, 10, 0, 10)
-    label.Font = Enum.Font.SourceSansBold
-    label.TextSize = 20
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = contentFrame
-
-    tabButton.MouseButton1Click:Connect(function()
-        -- Deactivate all tabs visually
-        for _, btn in tabButton.Parent:GetChildren() do
-            if btn:IsA("TextButton") then
-                btn.UIStroke.Thickness = 0
-            end
-        end
-        
-        -- Activate current tab visually
-        stroke.Thickness = 2
-        
-        -- Set active tab and update content
-        ActiveTab.Value = tabName
-        
-        -- Hide all content frames
-        for _, frame in ContentFrame:GetChildren() do
-            if frame:IsA("Frame") then
-                frame.Visible = false
-            end
-        end
-        
-        -- Show the selected content frame
-        contentFrame.Visible = true
-    end)
-    
-    -- Ensure stroke color updates on theme change
-    tabButton.Changed:Connect(function(property)
-        if property == "TextColor3" then
-            if ActiveTab.Value == tabName then
-                stroke.Color = Themes[CurrentTheme].AccentColor
-            end
-        end
-    end)
-    
-    return tabButton
-end
 
 --***********************************************************************
---** Core Logic Functions
+--** UI Utilities
 --***********************************************************************
 
--- Draggable implementation
 local function MakeDraggable(frame, titleBar)
     local dragging = false
     local dragStart = Vector2.new(0, 0)
@@ -261,7 +160,6 @@ local function MakeDraggable(frame, titleBar)
             local delta = input.Position - dragStart
             local newPos = frameStart + delta
             
-            -- Clamp position to stay within the screen
             local screenX = PlayerGui.AbsoluteSize.X
             local screenY = PlayerGui.AbsoluteSize.Y
             
@@ -273,18 +171,109 @@ local function MakeDraggable(frame, titleBar)
     end)
 end
 
--- Keybind implementation
 local function SetupKeybind()
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if input.KeyCode == Enum.KeyCode.RightShift and not gameProcessed then
-            if LibraryInstance then
-                LibraryInstance.Enabled = not LibraryInstance.Enabled
+            if MainWindow then
+                MainWindow.Visible = not MainWindow.Visible
             end
         end
     end)
 end
 
--- Initialization function
+--***********************************************************************
+--** Public Methods
+--***********************************************************************
+
+-- Public method for creating and registering new tabs
+function ExoUI:CreateTab(tabName, isDefault)
+    if not MainWindow or not MainWindow:FindFirstChild("TabContainer") then
+        error("ExoUI:CreateTab called before Init() or MainWindow not found.")
+        return nil
+    end
+
+    local TabsFrame = MainWindow:FindFirstChild("TabContainer"):FindFirstChild("Tabs")
+    local ContentFrame = MainWindow:FindFirstChild("ContentFrame")
+    local ActiveTab = MainWindow.ActiveTab
+    
+    local isFirstTab = ActiveTab.Value == ""
+    local shouldBeVisible = isDefault or (isFirstTab and tabName ~= "Settings")
+    
+    if isFirstTab and tabName ~= "Settings" then
+        ActiveTab.Value = tabName
+    end
+    
+    -- 1. Create Tab Button
+    local tabButton = Instance.new("TextButton")
+    tabButton.Name = tabName
+    tabButton.Text = tabName
+    tabButton.Size = UDim2.new(1, 0, 0, 40)
+    tabButton.BackgroundColor3 = Themes[CurrentTheme].SecondaryBg
+    tabButton.TextColor3 = Themes[CurrentTheme].ContentText
+    tabButton.Font = Enum.Font.SourceSansBold
+    tabButton.TextSize = 16
+    tabButton.Parent = TabsFrame
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim2.new(0, 4)
+    corner.Parent = tabButton
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = shouldBeVisible and 2 or 0
+    stroke.Color = Themes[CurrentTheme].AccentColor
+    stroke.Parent = tabButton
+
+    local padding = Instance.new("UIPadding")
+    padding.PaddingTop = UDim.new(0.05, 0)
+    padding.PaddingBottom = UDim.new(0.05, 0)
+    padding.Parent = tabButton
+    
+    -- Set LayoutOrder to ensure Settings is always last
+    tabButton.LayoutOrder = (tabName == "Settings") and 999 or 0 
+
+    -- 2. Create Content Frame
+    local contentFrame = Instance.new("Frame")
+    contentFrame.Name = tabName .. "Content"
+    contentFrame.Size = UDim2.new(1, 0, 1, 0)
+    contentFrame.BackgroundTransparency = 1
+    contentFrame.Parent = ContentFrame
+    contentFrame.Visible = shouldBeVisible
+    
+    -- 3. Connect Tab Button Logic
+    tabButton.MouseButton1Click:Connect(function()
+        -- Deactivate all tabs visually
+        for _, btn in tabButton.Parent:GetChildren() do
+            if btn:IsA("TextButton") then
+                btn.UIStroke.Thickness = 0
+            end
+        end
+        
+        -- Activate current tab visually
+        stroke.Thickness = 2
+        stroke.Color = Themes[CurrentTheme].AccentColor
+        
+        -- Set active tab 
+        ActiveTab.Value = tabName
+        
+        -- Hide settings panel
+        MainWindow.SettingsOpen.Value = false
+        
+        -- Hide all content frames
+        for _, frame in ContentFrame:GetChildren() do
+            if frame:IsA("Frame") then
+                frame.Visible = false
+            end
+        end
+        
+        -- Show the selected content frame
+        contentFrame.Visible = true
+    end)
+    
+    return contentFrame -- Return the content frame for customization
+end
+
+
+-- Initialization function (Creates ALL scaffolding: ScreenGui, Window, Tab/Content Containers)
 function ExoUI:Init(title)
     if LibraryInstance then
         print("ExoUI: Library already initialized.")
@@ -303,11 +292,11 @@ function ExoUI:Init(title)
     LibraryInstance.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     LibraryInstance.Parent = PlayerGui
     
-    -- 2. Create Main Window Frame
+    -- 2. Create Main Window Frame (Scaffolding)
     MainWindow = Instance.new("Frame")
     MainWindow.Name = "MainWindow"
     MainWindow.Size = UDim2.new(0, 500, 0, 350)
-    MainWindow.Position = UDim2.new(0.5, -250, 0.5, -175) -- Center of the screen
+    MainWindow.Position = UDim2.new(0.5, -250, 0.5, -175)
     MainWindow.BackgroundColor3 = Themes[CurrentTheme].PrimaryBg
     MainWindow.Parent = LibraryInstance
     
@@ -316,8 +305,11 @@ function ExoUI:Init(title)
     corner.Parent = MainWindow
     
     local padding = Instance.new("UIPadding")
-    padding.PaddingTop = UDim.new(0, 30) -- Make space for title bar
+    padding.PaddingTop = UDim.new(0, 30)
     padding.Parent = MainWindow
+    
+    -- Title Bar, Controls, etc. (Omitted for brevity, but included in the complete module)
+    -- ... (TitleBar, TitleLabel, CloseButton, MinimizeButton, SettingsButton setup) ...
     
     -- 3. Title Bar (Draggable Area)
     local TitleBar = Instance.new("Frame")
@@ -371,7 +363,7 @@ function ExoUI:Init(title)
     CloseCorner.Parent = CloseButton
     
     CloseButton.MouseButton1Click:Connect(function()
-        LibraryInstance:Destroy() -- Destroy the whole UI
+        LibraryInstance:Destroy()
     end)
     
     -- Minimize (-) button
@@ -390,7 +382,7 @@ function ExoUI:Init(title)
     MinimizeCorner.Parent = MinimizeButton
     
     MinimizeButton.MouseButton1Click:Connect(function()
-        MainWindow.Visible = false -- Hide the main window frame
+        MainWindow.Visible = false
     end)
     
     -- 5. Settings Panel Button (Gear Icon)
@@ -399,8 +391,7 @@ function ExoUI:Init(title)
     SettingsButton.Size = UDim2.new(0, 24, 0, 24)
     SettingsButton.Position = UDim2.new(0, 5, 0.5, -12)
     SettingsButton.BackgroundTransparency = 1
-    -- Use a common gear icon asset ID (This is a generic Roblox icon)
-    SettingsButton.Image = "rbxassetid://15222045618" -- Gear icon
+    SettingsButton.Image = "rbxassetid://15222045618" -- Example gear icon
     SettingsButton.ImageColor3 = Themes[CurrentTheme].AccentColor
     SettingsButton.Parent = TitleBar
     
@@ -408,11 +399,11 @@ function ExoUI:Init(title)
     SettingsOpen.Name = "SettingsOpen"
     SettingsOpen.Value = false
     SettingsOpen.Parent = MainWindow
-
-    -- 6. Tab and Settings Container
+    
+    -- 6. Tab Container (Holds tabs and settings panel)
     local TabContainer = Instance.new("Frame")
     TabContainer.Name = "TabContainer"
-    TabContainer.Size = UDim2.new(0.3, 0, 1, -30) -- 30% width, full height minus padding
+    TabContainer.Size = UDim2.new(0.3, 0, 1, -30)
     TabContainer.Position = UDim2.new(0, 0, 0, 30)
     TabContainer.BackgroundColor3 = Themes[CurrentTheme].SecondaryBg
     TabContainer.Parent = MainWindow
@@ -429,13 +420,13 @@ function ExoUI:Init(title)
     TabPadding.PaddingBottom = UDim.new(0, 5)
     TabPadding.Parent = TabContainer
 
-    -- Settings Sub-Panel (Initially hidden)
+    -- Settings Sub-Panel (Handles Theme Options)
     local SettingsPanel = Instance.new("Frame")
     SettingsPanel.Name = "SettingsPanel"
     SettingsPanel.Size = UDim2.new(1, 0, 1, 0)
     SettingsPanel.BackgroundTransparency = 1
     SettingsPanel.Parent = TabContainer
-    SettingsPanel.Visible = false -- Initially hidden
+    SettingsPanel.Visible = false
 
     local SettingsLayout = Instance.new("UIListLayout")
     SettingsLayout.Padding = UDim.new(0, 5)
@@ -450,12 +441,12 @@ function ExoUI:Init(title)
     Label.TextSize = 16
     Label.Parent = SettingsPanel
     
-    -- Create theme options
+    -- Create theme options UI elements
     CreateThemeOption(SettingsPanel, "Dark")
     CreateThemeOption(SettingsPanel, "Light")
     CreateThemeOption(SettingsPanel, "BlueNight")
 
-    -- Tabs Sub-Panel (Initially visible)
+    -- Tabs Sub-Panel (Container for dynamically created tabs)
     local TabsFrame = Instance.new("Frame")
     TabsFrame.Name = "Tabs"
     TabsFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -467,23 +458,19 @@ function ExoUI:Init(title)
     TabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
     TabsLayout.Parent = TabsFrame
     
-    -- 7. Content Frame (For tab contents)
+    -- 7. Content Frame (The area where tab contents go)
     local ContentFrame = Instance.new("Frame")
     ContentFrame.Name = "ContentFrame"
-    ContentFrame.Size = UDim2.new(0.7, 0, 1, -30) -- 70% width, full height minus padding
+    ContentFrame.Size = UDim2.new(0.7, 0, 1, -30)
     ContentFrame.Position = UDim2.new(0.3, 0, 0, 30)
     ContentFrame.BackgroundColor3 = Themes[CurrentTheme].PrimaryBg
     ContentFrame.Parent = MainWindow
     
-    -- Value to track active tab (used for theme application)
+    -- Value to track active tab (Crucial for cross-module communication)
     local ActiveTab = Instance.new("StringValue")
     ActiveTab.Name = "ActiveTab"
-    ActiveTab.Value = "" -- Initialize to empty
+    ActiveTab.Value = "" 
     ActiveTab.Parent = MainWindow
-
-    -- Create tab buttons and content using the new method
-    self:CreateTab("Combat", true) -- Default tab
-    self:CreateTab("Visual", false)
     
     -- 8. Connect Settings Button
     SettingsButton.MouseButton1Click:Connect(function()
@@ -492,18 +479,26 @@ function ExoUI:Init(title)
     
     SettingsOpen.Changed:Connect(function(value)
         if value then
-            SettingsPanel.Visible = true
             TabsFrame.Visible = false
+            SettingsPanel.Visible = true
+            -- Hide all feature content when settings open
+            for _, frame in ContentFrame:GetChildren() do
+                if frame:IsA("Frame") then frame.Visible = false end
+            end
         else
             SettingsPanel.Visible = false
             TabsFrame.Visible = true
+            -- Show active tab content when settings close
+            local activeTabName = ActiveTab.Value
+            if activeTabName ~= "" then
+                local content = ContentFrame:FindFirstChild(activeTabName .. "Content")
+                if content then content.Visible = true end
+            end
         end
     end)
     
     -- 9. Setup Keybind
     SetupKeybind()
-    
-    print("ExoUI: Library '" .. (title or "ExoUI Library") .. "' initialized successfully.")
     
     -- Apply the initial theme (Dark) to finalize colors
     ApplyTheme(CurrentTheme)
@@ -511,5 +506,4 @@ function ExoUI:Init(title)
     return ExoUI
 end
 
--- Return the library table
 return ExoUI
