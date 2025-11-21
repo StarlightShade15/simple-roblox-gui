@@ -9,8 +9,6 @@ local TweenService = game:GetService("TweenService")
 
 -- The main table to be returned as the module
 local ExoUI = {}
--- Define the Controls table HERE, before it's used by the section methods.
-ExoUI.Controls = {}
 
 -- Variables
 local Player = Players.LocalPlayer
@@ -31,7 +29,7 @@ local Config = {
     ControlHeight = 25,
     Font = Enum.Font.Roboto,
     FontSize = Enum.FontSize.Size14,
-    CornerRadius = UDim.new(0.05, 0) -- This is correct UDim
+    CornerRadius = UDim.new(0.05, 0)
 }
 
 -- Utility Functions
@@ -44,7 +42,503 @@ local function Create(ClassName, Properties)
 end
 
 -- =================================================================
--- UI Creation Functions (Init, Tab, Section, Controls)
+-- CONTROL IMPLEMENTATIONS (Defined as locals first to ensure order)
+-- =================================================================
+
+-- 1. Checkbox Implementation
+local function _CreateCheckbox(ParentFrame, controlName, defaultValue, callback)
+    
+    local ControlFrame = Create("Frame", {
+        Name = controlName:gsub("%s+", "_") .. "Control",
+        Size = UDim2.new(1, 0, 0, Config.ControlHeight),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Parent = ParentFrame
+    })
+    
+    -- Label
+    Create("TextLabel", {
+        Name = "Label",
+        Text = controlName,
+        Size = UDim2.new(1, -(Config.ControlHeight + Config.Padding), 1, 0),
+        Position = UDim2.new(0, 0, 0, 0),
+        Font = Config.Font,
+        TextSize = 14,
+        TextColor3 = Config.TextColor,
+        BackgroundTransparency = 1,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = ControlFrame
+    })
+    
+    local currentState = defaultValue
+    
+    -- Checkbox Button
+    local CheckButton = Create("TextButton", {
+        Name = "CheckButton",
+        Text = "",
+        Size = UDim2.new(0, Config.ControlHeight, 0, Config.ControlHeight),
+        Position = UDim2.new(1, -Config.ControlHeight, 0, 0),
+        BackgroundColor3 = Config.PrimaryColor,
+        BorderSizePixel = 0,
+        Parent = ControlFrame
+    })
+    
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 5),
+        Parent = CheckButton
+    })
+    
+    -- Checkmark visual (using a Frame, no images)
+    local Checkmark = Create("Frame", {
+        Name = "Checkmark",
+        Size = UDim2.new(0.6, 0, 0.6, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = Config.AccentColor,
+        BorderSizePixel = 0,
+        Visible = currentState,
+        Parent = CheckButton
+    })
+
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 3),
+        Parent = Checkmark
+    })
+
+    local function updateVisuals()
+        Checkmark.Visible = currentState
+        pcall(callback, currentState)
+    end
+    
+    local function onClick()
+        currentState = not currentState
+        updateVisuals()
+    end
+    
+    CheckButton.MouseButton1Click:Connect(onClick)
+    
+    -- Initial callback
+    pcall(callback, currentState)
+    
+    return ControlFrame
+end
+
+-- 2. Slider Implementation
+local function _CreateSlider(ParentFrame, controlName, min, max, defaultValue, increment, callback)
+
+    local ControlFrame = Create("Frame", {
+        Name = controlName:gsub("%s+", "_") .. "Control",
+        Size = UDim2.new(1, 0, 0, Config.ControlHeight * 2),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Parent = ParentFrame
+    })
+    
+    local currentValue = defaultValue
+    
+    -- Label and Value Display
+    local LabelValueFrame = Create("Frame", {
+        Name = "LabelValueFrame",
+        Size = UDim2.new(1, 0, 0, Config.ControlHeight),
+        BackgroundTransparency = 1,
+        Parent = ControlFrame
+    })
+
+    Create("TextLabel", {
+        Name = "Label",
+        Text = controlName,
+        Size = UDim2.new(0.7, 0, 1, 0),
+        Position = UDim2.new(0, 0, 0, 0),
+        Font = Config.Font,
+        TextSize = 14,
+        TextColor3 = Config.TextColor,
+        BackgroundTransparency = 1,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = LabelValueFrame
+    })
+
+    local ValueLabel = Create("TextLabel", {
+        Name = "Value",
+        Text = string.format("%.1f", currentValue),
+        Size = UDim2.new(0.3, 0, 1, 0),
+        Position = UDim2.new(0.7, 0, 0, 0),
+        Font = Config.Font,
+        TextSize = 14,
+        TextColor3 = Config.AccentColor,
+        BackgroundTransparency = 1,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        Parent = LabelValueFrame
+    })
+    
+    -- Slider Background
+    local SliderFrame = Create("Frame", {
+        Name = "SliderFrame",
+        Size = UDim2.new(1, 0, 0, Config.ControlHeight),
+        Position = UDim2.new(0, 0, 0, Config.ControlHeight),
+        BackgroundTransparency = 1,
+        Parent = ControlFrame
+    })
+    
+    local BackgroundBar = Create("Frame", {
+        Name = "BackgroundBar",
+        Size = UDim2.new(1, 0, 0, 4),
+        Position = UDim2.new(0, 0, 0.5, -2),
+        BackgroundColor3 = Config.PrimaryColor,
+        BorderSizePixel = 0,
+        Parent = SliderFrame
+    })
+    
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 2),
+        Parent = BackgroundBar
+    })
+    
+    -- Fill Bar
+    local FillBar = Create("Frame", {
+        Name = "FillBar",
+        Size = UDim2.new((currentValue - min) / (max - min), 0, 1, 0),
+        BackgroundColor3 = Config.AccentColor,
+        BorderSizePixel = 0,
+        Parent = BackgroundBar
+    })
+    
+    -- Thumb Handle
+    local Thumb = Create("Frame", {
+        Name = "Thumb",
+        Size = UDim2.new(0, 12, 0, 12),
+        Position = UDim2.new((currentValue - min) / (max - min), 0, 0.5, -6),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = Config.TextColor,
+        BorderSizePixel = 0,
+        Parent = SliderFrame
+    })
+    
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 6),
+        Parent = Thumb
+    })
+
+    -- Dragging Logic
+    local IsDraggingSlider = false
+
+    local function updateValue(inputPos)
+        local barWidth = BackgroundBar.AbsoluteSize.X
+        local barX = BackgroundBar.AbsolutePosition.X
+        local relativeX = math.clamp(inputPos.X - barX, 0, barWidth)
+        local percentage = relativeX / barWidth
+        
+        local rawValue = min + (max - min) * percentage
+        
+        -- Apply increment/step
+        if increment > 0 then
+            rawValue = math.floor(rawValue / increment + 0.5) * increment
+        end
+        
+        currentValue = math.clamp(rawValue, min, max)
+        
+        -- Update UI
+        local newScale = (currentValue - min) / (max - min)
+        FillBar.Size = UDim2.new(newScale, 0, 1, 0)
+        Thumb.Position = UDim2.new(newScale, 0, 0.5, -6)
+        ValueLabel.Text = string.format("%.1f", currentValue)
+        
+        pcall(callback, currentValue)
+    end
+
+    local function StartDragSlider(input, gameProcessedEvent)
+        if gameProcessedEvent then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            IsDraggingSlider = true
+            local inputPosition = Vector2.new(input.Position.X, input.Position.Y)
+            updateValue(inputPosition)
+        end
+    end
+    
+    local function DoDragSlider(input)
+        if IsDraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local inputPosition = Vector2.new(input.Position.X, input.Position.Y)
+            updateValue(inputPosition)
+        end
+    end
+
+    local function EndDragSlider(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            IsDraggingSlider = false
+        end
+    end
+
+    -- Connect to InputBegan on the draggable surfaces
+    Thumb.InputBegan:Connect(StartDragSlider)
+    BackgroundBar.InputBegan:Connect(StartDragSlider)
+    
+    -- Connect to global input events for continuous dragging
+    UserInputService.InputChanged:Connect(DoDragSlider)
+    UserInputService.InputEnded:Connect(EndDragSlider)
+    
+    -- Initial callback
+    pcall(callback, currentValue)
+
+    return ControlFrame
+end
+
+-- 3. Dropdown Implementation
+local function _CreateDropdown(ParentFrame, controlName, options, defaultValue, callback)
+    
+    local ControlFrame = Create("Frame", {
+        Name = controlName:gsub("%s+", "_") .. "Control",
+        Size = UDim2.new(1, 0, 0, Config.ControlHeight),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Parent = ParentFrame
+    })
+    
+    -- Label
+    Create("TextLabel", {
+        Name = "Label",
+        Text = controlName,
+        Size = UDim2.new(0.5, 0, 1, 0),
+        Position = UDim2.new(0, 0, 0, 0),
+        Font = Config.Font,
+        TextSize = 14,
+        TextColor3 = Config.TextColor,
+        BackgroundTransparency = 1,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = ControlFrame
+    })
+    
+    local currentState = defaultValue
+    local OptionsContainer = nil -- Initialize here
+    
+    -- Dropdown Button
+    local DropdownButton = Create("TextButton", {
+        Name = "DropdownButton",
+        Text = defaultValue,
+        Size = UDim2.new(0.45, 0, 1, 0),
+        Position = UDim2.new(0.55, 0, 0, 0),
+        BackgroundColor3 = Config.PrimaryColor,
+        TextColor3 = Config.TextColor,
+        Font = Config.Font,
+        TextSize = 14,
+        BorderSizePixel = 0,
+        Parent = ControlFrame
+    })
+    
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 5),
+        Parent = DropdownButton
+    })
+    
+    -- Options Container setup function
+    local function createOptionsContainer()
+        OptionsContainer = Create("Frame", {
+            Name = "DropdownOptionsContainer",
+            Size = UDim2.new(0, 0, 0, 0), 
+            Position = UDim2.new(0, 0, 0, 0),
+            AnchorPoint = Vector2.new(0, 0),
+            BackgroundColor3 = Config.PrimaryColor,
+            BorderSizePixel = 0,
+            Visible = false,
+            ZIndex = 5, 
+            Parent = ScreenGui -- <-- **Parented to ScreenGui for overlay**
+        })
+        
+        Create("UICorner", {
+            CornerRadius = UDim.new(0, 5),
+            Parent = OptionsContainer
+        })
+        
+        local OptionsLayout = Create("UIListLayout", {
+            Name = "OptionsLayout",
+            Padding = UDim.new(0, 1),
+            FillDirection = Enum.FillDirection.Vertical,
+            Parent = OptionsContainer,
+            SortOrder = Enum.SortOrder.LayoutOrder
+        })
+        
+        -- Function to handle option selection
+        local function selectOption(option)
+            currentState = option
+            DropdownButton.Text = option
+            OptionsContainer.Visible = false
+            pcall(callback, option)
+        end
+        
+        -- Populate Options
+        for i, option in ipairs(options) do
+            local OptionButton = Create("TextButton", {
+                Name = option:gsub("%s+", "_") .. "Option",
+                Text = option,
+                Size = UDim2.new(1, 0, 0, Config.ControlHeight),
+                BackgroundColor3 = Config.PrimaryColor,
+                TextColor3 = Config.TextColor,
+                Font = Config.Font,
+                TextSize = 14,
+                BorderSizePixel = 0,
+                Parent = OptionsContainer
+            })
+            
+            -- Highlight on hover/selection
+            OptionButton.MouseEnter:Connect(function() OptionButton.BackgroundColor3 = Config.AccentColor end)
+            OptionButton.MouseLeave:Connect(function() OptionButton.BackgroundColor3 = Config.PrimaryColor end)
+            
+            OptionButton.MouseButton1Click:Connect(function()
+                selectOption(option)
+            end)
+        end
+        
+        -- Wait for the UIListLayout to calculate its size, then update container height
+        OptionsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            OptionsContainer.Size = UDim2.new(0, DropdownButton.AbsoluteSize.X, 0, OptionsLayout.AbsoluteContentSize.Y)
+        end)
+        
+        -- Destroy the detached container if the control is removed
+        ControlFrame.AncestryChanged:Connect(function()
+            if not ControlFrame.Parent then
+                OptionsContainer:Destroy()
+            end
+        end)
+
+        return OptionsLayout
+    end
+    
+    local OptionsLayout = createOptionsContainer()
+
+
+    -- Toggle Dropdown
+    local function toggleDropdown()
+        
+        -- If another dropdown is open, close it first
+        for _, child in ipairs(ScreenGui:GetChildren()) do
+            if child.Name == "DropdownOptionsContainer" and child ~= OptionsContainer then
+                child.Visible = false
+            end
+        end
+
+        OptionsContainer.Visible = not OptionsContainer.Visible
+        
+        if OptionsContainer.Visible then
+            local absPos = DropdownButton.AbsolutePosition
+            local absSize = DropdownButton.AbsoluteSize
+            
+            OptionsContainer.Size = UDim2.new(0, absSize.X, 0, OptionsLayout.AbsoluteContentSize.Y)
+            OptionsContainer.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 1)
+        end
+    end
+    
+    -- Close the dropdown if the user clicks anywhere else
+    local closeConnection = UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+        if not gameProcessedEvent and OptionsContainer.Visible then
+            local mousePos = Vector2.new(input.Position.X, input.Position.Y)
+            -- Simple check if the click is outside
+            local isOverButton = DropdownButton:GetAbsolutePosition().X <= mousePos.X and mousePos.X <= DropdownButton:GetAbsolutePosition().X + DropdownButton.AbsoluteSize.X and
+                                 DropdownButton:GetAbsolutePosition().Y <= mousePos.Y and mousePos.Y <= DropdownButton:GetAbsolutePosition().Y + DropdownButton.AbsoluteSize.Y
+            
+            local isOverOptions = OptionsContainer:GetAbsolutePosition().X <= mousePos.X and mousePos.X <= OptionsContainer:GetAbsolutePosition().X + OptionsContainer.AbsoluteSize.X and
+                                  OptionsContainer:GetAbsolutePosition().Y <= mousePos.Y and mousePos.Y <= OptionsContainer:GetAbsolutePosition().Y + OptionsContainer.AbsoluteSize.Y
+
+            if not isOverButton and not isOverOptions then
+                OptionsContainer.Visible = false
+            end
+        end
+    end)
+    
+    DropdownButton.MouseButton1Click:Connect(toggleDropdown)
+    
+    -- Initial callback
+    pcall(callback, currentState)
+    
+    return ControlFrame
+end
+
+-- 4. Textbox Implementation
+local function _CreateTextbox(ParentFrame, controlName, placeholder, defaultValue, callback)
+
+    local ControlFrame = Create("Frame", {
+        Name = controlName:gsub("%s+", "_") .. "Control",
+        Size = UDim2.new(1, 0, 0, Config.ControlHeight),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Parent = ParentFrame
+    })
+
+    -- Label
+    Create("TextLabel", {
+        Name = "Label",
+        Text = controlName,
+        Size = UDim2.new(0.5, 0, 1, 0),
+        Position = UDim2.new(0, 0, 0, 0),
+        Font = Config.Font,
+        TextSize = 14,
+        TextColor3 = Config.TextColor,
+        BackgroundTransparency = 1,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = ControlFrame
+    })
+
+    -- Textbox
+    local TextBox = Create("TextBox", {
+        Name = "TextBox",
+        Size = UDim2.new(0.45, 0, 1, 0),
+        Position = UDim2.new(0.55, 0, 0, 0),
+        BackgroundColor3 = Config.PrimaryColor,
+        TextColor3 = Config.TextColor,
+        Font = Config.Font,
+        TextSize = 14,
+        Text = defaultValue or "",
+        PlaceholderText = placeholder or "Enter value...",
+        PlaceholderColor3 = Config.TextColor:lerp(Config.PrimaryColor, 0.5),
+        ClearTextOnFocus = false,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        BorderSizePixel = 0,
+        Parent = ControlFrame
+    })
+    
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 5),
+        Parent = TextBox
+    })
+
+    -- Change handling
+    local function onTextChange()
+        pcall(callback, TextBox.Text)
+    end
+    
+    -- Use FocusLost to commit the text, especially when enter is pressed
+    TextBox.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            onTextChange()
+        end
+    end)
+    
+    -- Also use TextChanged for real-time updates if needed
+    TextBox.Changed:Connect(function(property)
+        if property == "Text" then
+            onTextChange()
+        end
+    end)
+
+
+    -- Initial callback
+    pcall(callback, defaultValue or "")
+
+    return ControlFrame
+end
+
+-- =================================================================
+-- CONTROL REGISTRATION (Link local functions to the global table)
+-- =================================================================
+
+-- Create the Controls table (needed for the section methods)
+ExoUI.Controls = {
+    _CreateCheckbox = _CreateCheckbox,
+    _CreateSlider = _CreateSlider,
+    _CreateDropdown = _CreateDropdown,
+    _CreateTextbox = _CreateTextbox,
+}
+
+
+-- =================================================================
+-- UI Creation Functions (Init, Tab, Section)
 -- =================================================================
 
 -- 1. Main UI and Drag Logic
@@ -64,7 +558,7 @@ function ExoUI:Init(Title)
         Parent = ScreenGui,
     })
 
-    -- Add rounded corners (FIXED: UDim.new instead of UDim2.new)
+    -- Add rounded corners
     Create("UICorner", {
         CornerRadius = UDim.new(0, 8),
         Parent = MainFrame
@@ -81,7 +575,7 @@ function ExoUI:Init(Title)
 
     -- Apply corner radius only to the top corners of the header (since it's inside MainFrame)
     Create("UICorner", {
-        CornerRadius = UDim.new(0, 8), -- FIXED: UDim.new instead of UDim2.new
+        CornerRadius = UDim.new(0, 8),
         Parent = HeaderFrame
     })
 
@@ -132,7 +626,7 @@ function ExoUI:Init(Title)
     })
     
     Create("UICorner", {
-        CornerRadius = UDim.new(0, 5), -- FIXED: UDim.new instead of UDim2.new
+        CornerRadius = UDim.new(0, 5),
         Parent = MinimizeButton
     })
     
@@ -155,7 +649,7 @@ function ExoUI:Init(Title)
     })
     
     Create("UICorner", {
-        CornerRadius = UDim.new(0, 5), -- FIXED: UDim.new instead of UDim2.new
+        CornerRadius = UDim.new(0, 5),
         Parent = CloseButton
     })
     
@@ -403,17 +897,18 @@ function ExoUI:CreateTab(Name, IsDefault)
         }
 
         -- Add Control Creation Methods
+        -- These now safely reference the functions registered in ExoUI.Controls
         function sectionTable:checkbox(controlName, defaultValue, callback)
-            return ExoUI.Controls:_CreateCheckbox(self.Controls, controlName, defaultValue, callback)
+            return ExoUI.Controls._CreateCheckbox(self.Controls, controlName, defaultValue, callback)
         end
         function sectionTable:slider(controlName, min, max, defaultValue, increment, callback)
-            return ExoUI.Controls:_CreateSlider(self.Controls, controlName, min, max, defaultValue, increment, callback)
+            return ExoUI.Controls._CreateSlider(self.Controls, controlName, min, max, defaultValue, increment, callback)
         end
         function sectionTable:dropdown(controlName, options, defaultValue, callback)
-            return ExoUI.Controls:_CreateDropdown(self.Controls, controlName, options, defaultValue, callback)
+            return ExoUI.Controls._CreateDropdown(self.Controls, controlName, options, defaultValue, callback)
         end
         function sectionTable:textbox(controlName, placeholder, defaultValue, callback)
-            return ExoUI.Controls:_CreateTextbox(self.Controls, controlName, placeholder, defaultValue, callback)
+            return ExoUI.Controls._CreateTextbox(self.Controls, controlName, placeholder, defaultValue, callback)
         end
         
         -- Store section
@@ -423,485 +918,6 @@ function ExoUI:CreateTab(Name, IsDefault)
     
     ExoUI.Tabs[Name] = tabTable
     return tabTable
-end
-
--- 3. Checkbox
-function ExoUI.Controls:_CreateCheckbox(ParentFrame, controlName, defaultValue, callback)
-    
-    local ControlFrame = Create("Frame", {
-        Name = controlName:gsub("%s+", "_") .. "Control",
-        Size = UDim2.new(1, 0, 0, Config.ControlHeight),
-        BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        Parent = ParentFrame
-    })
-    
-    -- Label
-    Create("TextLabel", {
-        Name = "Label",
-        Text = controlName,
-        Size = UDim2.new(1, -(Config.ControlHeight + Config.Padding), 1, 0),
-        Position = UDim2.new(0, 0, 0, 0),
-        Font = Config.Font,
-        TextSize = 14,
-        TextColor3 = Config.TextColor,
-        BackgroundTransparency = 1,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = ControlFrame
-    })
-    
-    local currentState = defaultValue
-    
-    -- Checkbox Button
-    local CheckButton = Create("TextButton", {
-        Name = "CheckButton",
-        Text = "",
-        Size = UDim2.new(0, Config.ControlHeight, 0, Config.ControlHeight),
-        Position = UDim2.new(1, -Config.ControlHeight, 0, 0),
-        BackgroundColor3 = Config.PrimaryColor,
-        BorderSizePixel = 0,
-        Parent = ControlFrame
-    })
-    
-    Create("UICorner", {
-        CornerRadius = UDim.new(0, 5), -- FIXED: UDim.new instead of UDim2.new
-        Parent = CheckButton
-    })
-    
-    -- Checkmark visual (using a Frame, no images)
-    local Checkmark = Create("Frame", {
-        Name = "Checkmark",
-        Size = UDim2.new(0.6, 0, 0.6, 0),
-        Position = UDim2.new(0.5, 0, 0.5, 0),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        BackgroundColor3 = Config.AccentColor,
-        BorderSizePixel = 0,
-        Visible = currentState,
-        Parent = CheckButton
-    })
-
-    Create("UICorner", {
-        CornerRadius = UDim.new(0, 3), -- FIXED: UDim.new instead of UDim2.new
-        Parent = Checkmark
-    })
-
-    local function updateVisuals()
-        Checkmark.Visible = currentState
-        pcall(callback, currentState)
-    end
-    
-    local function onClick()
-        currentState = not currentState
-        updateVisuals()
-    end
-    
-    CheckButton.MouseButton1Click:Connect(onClick)
-    
-    -- Initial callback
-    pcall(callback, currentState)
-    
-    return ControlFrame
-end
-
--- 4. Slider
-function ExoUI.Controls:_CreateSlider(ParentFrame, controlName, min, max, defaultValue, increment, callback)
-
-    local ControlFrame = Create("Frame", {
-        Name = controlName:gsub("%s+", "_") .. "Control",
-        Size = UDim2.new(1, 0, 0, Config.ControlHeight * 2),
-        BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        Parent = ParentFrame
-    })
-    
-    local currentValue = defaultValue
-    
-    -- Label and Value Display
-    local LabelValueFrame = Create("Frame", {
-        Name = "LabelValueFrame",
-        Size = UDim2.new(1, 0, 0, Config.ControlHeight),
-        BackgroundTransparency = 1,
-        Parent = ControlFrame
-    })
-
-    Create("TextLabel", {
-        Name = "Label",
-        Text = controlName,
-        Size = UDim2.new(0.7, 0, 1, 0),
-        Position = UDim2.new(0, 0, 0, 0),
-        Font = Config.Font,
-        TextSize = 14,
-        TextColor3 = Config.TextColor,
-        BackgroundTransparency = 1,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = LabelValueFrame
-    })
-
-    local ValueLabel = Create("TextLabel", {
-        Name = "Value",
-        Text = string.format("%.1f", currentValue),
-        Size = UDim2.new(0.3, 0, 1, 0),
-        Position = UDim2.new(0.7, 0, 0, 0),
-        Font = Config.Font,
-        TextSize = 14,
-        TextColor3 = Config.AccentColor,
-        BackgroundTransparency = 1,
-        TextXAlignment = Enum.TextXAlignment.Right,
-        Parent = LabelValueFrame
-    })
-    
-    -- Slider Background
-    local SliderFrame = Create("Frame", {
-        Name = "SliderFrame",
-        Size = UDim2.new(1, 0, 0, Config.ControlHeight),
-        Position = UDim2.new(0, 0, 0, Config.ControlHeight),
-        BackgroundTransparency = 1,
-        Parent = ControlFrame
-    })
-    
-    local BackgroundBar = Create("Frame", {
-        Name = "BackgroundBar",
-        Size = UDim2.new(1, 0, 0, 4),
-        Position = UDim2.new(0, 0, 0.5, -2),
-        BackgroundColor3 = Config.PrimaryColor,
-        BorderSizePixel = 0,
-        Parent = SliderFrame
-    })
-    
-    Create("UICorner", {
-        CornerRadius = UDim.new(0, 2), -- FIXED: UDim.new instead of UDim2.new
-        Parent = BackgroundBar
-    })
-    
-    -- Fill Bar
-    local FillBar = Create("Frame", {
-        Name = "FillBar",
-        Size = UDim2.new((currentValue - min) / (max - min), 0, 1, 0),
-        BackgroundColor3 = Config.AccentColor,
-        BorderSizePixel = 0,
-        Parent = BackgroundBar
-    })
-    
-    -- Thumb Handle
-    local Thumb = Create("Frame", {
-        Name = "Thumb",
-        Size = UDim2.new(0, 12, 0, 12),
-        Position = UDim2.new((currentValue - min) / (max - min), 0, 0.5, -6),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        BackgroundColor3 = Config.TextColor,
-        BorderSizePixel = 0,
-        Parent = SliderFrame
-    })
-    
-    Create("UICorner", {
-        CornerRadius = UDim.new(0, 6), -- FIXED: UDim.new instead of UDim2.new
-        Parent = Thumb
-    })
-
-    -- Dragging Logic
-    local IsDraggingSlider = false
-
-    local function updateValue(inputPos)
-        local barWidth = BackgroundBar.AbsoluteSize.X
-        local barX = BackgroundBar.AbsolutePosition.X
-        local relativeX = math.clamp(inputPos.X - barX, 0, barWidth)
-        local percentage = relativeX / barWidth
-        
-        local rawValue = min + (max - min) * percentage
-        
-        -- Apply increment/step
-        if increment > 0 then
-            rawValue = math.floor(rawValue / increment + 0.5) * increment
-        end
-        
-        currentValue = math.clamp(rawValue, min, max)
-        
-        -- Update UI
-        local newScale = (currentValue - min) / (max - min)
-        FillBar.Size = UDim2.new(newScale, 0, 1, 0)
-        Thumb.Position = UDim2.new(newScale, 0, 0.5, -6)
-        ValueLabel.Text = string.format("%.1f", currentValue)
-        
-        pcall(callback, currentValue)
-    end
-
-    local function StartDragSlider(input, gameProcessedEvent)
-        if gameProcessedEvent then return end
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            IsDraggingSlider = true
-            local inputPosition = Vector2.new(input.Position.X, input.Position.Y)
-            updateValue(inputPosition)
-        end
-    end
-    
-    local function DoDragSlider(input)
-        if IsDraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local inputPosition = Vector2.new(input.Position.X, input.Position.Y)
-            updateValue(inputPosition)
-        end
-    end
-
-    local function EndDragSlider(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            IsDraggingSlider = false
-        end
-    end
-
-    -- Connect to InputBegan on the draggable surfaces
-    Thumb.InputBegan:Connect(StartDragSlider)
-    BackgroundBar.InputBegan:Connect(StartDragSlider)
-    
-    -- Connect to global input events for continuous dragging
-    UserInputService.InputChanged:Connect(DoDragSlider)
-    UserInputService.InputEnded:Connect(EndDragSlider)
-    
-    -- Initial callback
-    pcall(callback, currentValue)
-
-    return ControlFrame
-end
-
--- 5. Dropdown
-function ExoUI.Controls:_CreateDropdown(ParentFrame, controlName, options, defaultValue, callback)
-    
-    local ControlFrame = Create("Frame", {
-        Name = controlName:gsub("%s+", "_") .. "Control",
-        Size = UDim2.new(1, 0, 0, Config.ControlHeight),
-        BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        Parent = ParentFrame
-    })
-    
-    -- Label
-    Create("TextLabel", {
-        Name = "Label",
-        Text = controlName,
-        Size = UDim2.new(0.5, 0, 1, 0),
-        Position = UDim2.new(0, 0, 0, 0),
-        Font = Config.Font,
-        TextSize = 14,
-        TextColor3 = Config.TextColor,
-        BackgroundTransparency = 1,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = ControlFrame
-    })
-    
-    local currentState = defaultValue
-    local OptionsContainer = nil -- Initialize here
-    
-    -- Dropdown Button
-    local DropdownButton = Create("TextButton", {
-        Name = "DropdownButton",
-        Text = defaultValue,
-        Size = UDim2.new(0.45, 0, 1, 0),
-        Position = UDim2.new(0.55, 0, 0, 0),
-        BackgroundColor3 = Config.PrimaryColor,
-        TextColor3 = Config.TextColor,
-        Font = Config.Font,
-        TextSize = 14,
-        BorderSizePixel = 0,
-        Parent = ControlFrame
-    })
-    
-    Create("UICorner", {
-        CornerRadius = UDim.new(0, 5), -- FIXED: UDim.new instead of UDim2.new
-        Parent = DropdownButton
-    })
-    
-    -- Options Container setup function
-    local function createOptionsContainer()
-        OptionsContainer = Create("Frame", {
-            Name = "DropdownOptionsContainer",
-            Size = UDim2.new(0, 0, 0, 0), 
-            Position = UDim2.new(0, 0, 0, 0),
-            AnchorPoint = Vector2.new(0, 0),
-            BackgroundColor3 = Config.PrimaryColor,
-            BorderSizePixel = 0,
-            Visible = false,
-            ZIndex = 5, 
-            Parent = ScreenGui -- <-- **Parented to ScreenGui for overlay**
-        })
-        
-        Create("UICorner", {
-            CornerRadius = UDim.new(0, 5), -- FIXED: UDim.new instead of UDim2.new
-            Parent = OptionsContainer
-        })
-        
-        local OptionsLayout = Create("UIListLayout", {
-            Name = "OptionsLayout",
-            Padding = UDim.new(0, 1),
-            FillDirection = Enum.FillDirection.Vertical,
-            Parent = OptionsContainer,
-            SortOrder = Enum.SortOrder.LayoutOrder
-        })
-        
-        -- Function to handle option selection
-        local function selectOption(option)
-            currentState = option
-            DropdownButton.Text = option
-            OptionsContainer.Visible = false
-            pcall(callback, option)
-        end
-        
-        -- Populate Options
-        for i, option in ipairs(options) do
-            local OptionButton = Create("TextButton", {
-                Name = option:gsub("%s+", "_") .. "Option",
-                Text = option,
-                Size = UDim2.new(1, 0, 0, Config.ControlHeight),
-                BackgroundColor3 = Config.PrimaryColor,
-                TextColor3 = Config.TextColor,
-                Font = Config.Font,
-                TextSize = 14,
-                BorderSizePixel = 0,
-                Parent = OptionsContainer
-            })
-            
-            -- Highlight on hover/selection
-            OptionButton.MouseEnter:Connect(function() OptionButton.BackgroundColor3 = Config.AccentColor end)
-            OptionButton.MouseLeave:Connect(function() OptionButton.BackgroundColor3 = Config.PrimaryColor end)
-            
-            OptionButton.MouseButton1Click:Connect(function()
-                selectOption(option)
-            end)
-        end
-        
-        -- Wait for the UIListLayout to calculate its size, then update container height
-        OptionsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            OptionsContainer.Size = UDim2.new(0, DropdownButton.AbsoluteSize.X, 0, OptionsLayout.AbsoluteContentSize.Y)
-        end)
-        
-        -- Destroy the detached container if the control is removed
-        ControlFrame.AncestryChanged:Connect(function()
-            if not ControlFrame.Parent then
-                OptionsContainer:Destroy()
-            end
-        end)
-
-        return OptionsLayout
-    end
-    
-    local OptionsLayout = createOptionsContainer()
-
-
-    -- Toggle Dropdown
-    local function toggleDropdown()
-        
-        -- If another dropdown is open, close it first
-        for _, child in ipairs(ScreenGui:GetChildren()) do
-            if child.Name == "DropdownOptionsContainer" and child ~= OptionsContainer then
-                child.Visible = false
-            end
-        end
-
-        OptionsContainer.Visible = not OptionsContainer.Visible
-        
-        if OptionsContainer.Visible then
-            local absPos = DropdownButton.AbsolutePosition
-            local absSize = DropdownButton.AbsoluteSize
-            
-            OptionsContainer.Size = UDim2.new(0, absSize.X, 0, OptionsLayout.AbsoluteContentSize.Y)
-            OptionsContainer.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 1)
-        end
-    end
-    
-    -- Close the dropdown if the user clicks anywhere else
-    local closeConnection = UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
-        if not gameProcessedEvent and OptionsContainer.Visible then
-            local mousePos = Vector2.new(input.Position.X, input.Position.Y)
-            -- Simple check if the click is outside
-            local isOverButton = DropdownButton:GetAbsolutePosition().X <= mousePos.X and mousePos.X <= DropdownButton:GetAbsolutePosition().X + DropdownButton.AbsoluteSize.X and
-                                 DropdownButton:GetAbsolutePosition().Y <= mousePos.Y and mousePos.Y <= DropdownButton:GetAbsolutePosition().Y + DropdownButton.AbsoluteSize.Y
-            
-            local isOverOptions = OptionsContainer:GetAbsolutePosition().X <= mousePos.X and mousePos.X <= OptionsContainer:GetAbsolutePosition().X + OptionsContainer.AbsoluteSize.X and
-                                  OptionsContainer:GetAbsolutePosition().Y <= mousePos.Y and mousePos.Y <= OptionsContainer:GetAbsolutePosition().Y + OptionsContainer.AbsoluteSize.Y
-
-            if not isOverButton and not isOverOptions then
-                OptionsContainer.Visible = false
-            end
-        end
-    end)
-    
-    DropdownButton.MouseButton1Click:Connect(toggleDropdown)
-    
-    -- Initial callback
-    pcall(callback, currentState)
-    
-    return ControlFrame
-end
-
--- 6. Textbox
-function ExoUI.Controls:_CreateTextbox(ParentFrame, controlName, placeholder, defaultValue, callback)
-
-    local ControlFrame = Create("Frame", {
-        Name = controlName:gsub("%s+", "_") .. "Control",
-        Size = UDim2.new(1, 0, 0, Config.ControlHeight),
-        BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        Parent = ParentFrame
-    })
-
-    -- Label
-    Create("TextLabel", {
-        Name = "Label",
-        Text = controlName,
-        Size = UDim2.new(0.5, 0, 1, 0),
-        Position = UDim2.new(0, 0, 0, 0),
-        Font = Config.Font,
-        TextSize = 14,
-        TextColor3 = Config.TextColor,
-        BackgroundTransparency = 1,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = ControlFrame
-    })
-
-    -- Textbox
-    local TextBox = Create("TextBox", {
-        Name = "TextBox",
-        Size = UDim2.new(0.45, 0, 1, 0),
-        Position = UDim2.new(0.55, 0, 0, 0),
-        BackgroundColor3 = Config.PrimaryColor,
-        TextColor3 = Config.TextColor,
-        Font = Config.Font,
-        TextSize = 14,
-        Text = defaultValue or "",
-        PlaceholderText = placeholder or "Enter value...",
-        PlaceholderColor3 = Config.TextColor:lerp(Config.PrimaryColor, 0.5),
-        ClearTextOnFocus = false,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        BorderSizePixel = 0,
-        Parent = ControlFrame
-    })
-    
-    Create("UICorner", {
-        CornerRadius = UDim.new(0, 5), -- FIXED: UDim.new instead of UDim2.new
-        Parent = TextBox
-    })
-
-    -- Change handling
-    local function onTextChange()
-        pcall(callback, TextBox.Text)
-    end
-    
-    -- Use FocusLost to commit the text, especially when enter is pressed
-    TextBox.FocusLost:Connect(function(enterPressed)
-        if enterPressed then
-            onTextChange()
-        end
-    end)
-    
-    -- Also use TextChanged for real-time updates if needed
-    TextBox.Changed:Connect(function(property)
-        if property == "Text" then
-            onTextChange()
-        end
-    end)
-
-
-    -- Initial callback
-    pcall(callback, defaultValue or "")
-
-    return ControlFrame
 end
 
 
