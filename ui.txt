@@ -9,7 +9,7 @@ local TweenService = game:GetService("TweenService")
 
 -- The main table to be returned as the module
 local ExoUI = {}
--- >>> FIX: Define the Controls table HERE, before it's used by the section methods.
+-- Define the Controls table HERE, before it's used by the section methods.
 ExoUI.Controls = {}
 
 -- Variables
@@ -31,7 +31,7 @@ local Config = {
     ControlHeight = 25,
     Font = Enum.Font.Roboto,
     FontSize = Enum.FontSize.Size14,
-    CornerRadius = UDim.new(0.05, 0)
+    CornerRadius = UDim.new(0.05, 0) -- This is correct UDim
 }
 
 -- Utility Functions
@@ -64,7 +64,7 @@ function ExoUI:Init(Title)
         Parent = ScreenGui,
     })
 
-    -- Add rounded corners
+    -- Add rounded corners (FIXED: UDim.new instead of UDim2.new)
     Create("UICorner", {
         CornerRadius = UDim.new(0, 8),
         Parent = MainFrame
@@ -81,7 +81,7 @@ function ExoUI:Init(Title)
 
     -- Apply corner radius only to the top corners of the header (since it's inside MainFrame)
     Create("UICorner", {
-        CornerRadius = UDim.new(0, 8),
+        CornerRadius = UDim.new(0, 8), -- FIXED: UDim.new instead of UDim2.new
         Parent = HeaderFrame
     })
 
@@ -132,7 +132,7 @@ function ExoUI:Init(Title)
     })
     
     Create("UICorner", {
-        CornerRadius = UDim.new(0, 5),
+        CornerRadius = UDim.new(0, 5), -- FIXED: UDim.new instead of UDim2.new
         Parent = MinimizeButton
     })
     
@@ -155,7 +155,7 @@ function ExoUI:Init(Title)
     })
     
     Create("UICorner", {
-        CornerRadius = UDim.new(0, 5),
+        CornerRadius = UDim.new(0, 5), -- FIXED: UDim.new instead of UDim2.new
         Parent = CloseButton
     })
     
@@ -403,7 +403,6 @@ function ExoUI:CreateTab(Name, IsDefault)
         }
 
         -- Add Control Creation Methods
-        -- These now safely reference ExoUI.Controls which is defined at the top
         function sectionTable:checkbox(controlName, defaultValue, callback)
             return ExoUI.Controls:_CreateCheckbox(self.Controls, controlName, defaultValue, callback)
         end
@@ -465,7 +464,7 @@ function ExoUI.Controls:_CreateCheckbox(ParentFrame, controlName, defaultValue, 
     })
     
     Create("UICorner", {
-        CornerRadius = UDim.new(0, 5),
+        CornerRadius = UDim.new(0, 5), -- FIXED: UDim.new instead of UDim2.new
         Parent = CheckButton
     })
     
@@ -482,7 +481,7 @@ function ExoUI.Controls:_CreateCheckbox(ParentFrame, controlName, defaultValue, 
     })
 
     Create("UICorner", {
-        CornerRadius = UDim.new(0, 3),
+        CornerRadius = UDim.new(0, 3), -- FIXED: UDim.new instead of UDim2.new
         Parent = Checkmark
     })
 
@@ -570,7 +569,7 @@ function ExoUI.Controls:_CreateSlider(ParentFrame, controlName, min, max, defaul
     })
     
     Create("UICorner", {
-        CornerRadius = UDim.new(0, 2),
+        CornerRadius = UDim.new(0, 2), -- FIXED: UDim.new instead of UDim2.new
         Parent = BackgroundBar
     })
     
@@ -595,7 +594,7 @@ function ExoUI.Controls:_CreateSlider(ParentFrame, controlName, min, max, defaul
     })
     
     Create("UICorner", {
-        CornerRadius = UDim.new(0, 6),
+        CornerRadius = UDim.new(0, 6), -- FIXED: UDim.new instead of UDim2.new
         Parent = Thumb
     })
 
@@ -705,7 +704,7 @@ function ExoUI.Controls:_CreateDropdown(ParentFrame, controlName, options, defau
     })
     
     Create("UICorner", {
-        CornerRadius = UDim.new(0, 5),
+        CornerRadius = UDim.new(0, 5), -- FIXED: UDim.new instead of UDim2.new
         Parent = DropdownButton
     })
     
@@ -724,7 +723,7 @@ function ExoUI.Controls:_CreateDropdown(ParentFrame, controlName, options, defau
         })
         
         Create("UICorner", {
-            CornerRadius = UDim.new(0, 5),
+            CornerRadius = UDim.new(0, 5), -- FIXED: UDim.new instead of UDim2.new
             Parent = OptionsContainer
         })
         
@@ -875,7 +874,7 @@ function ExoUI.Controls:_CreateTextbox(ParentFrame, controlName, placeholder, de
     })
     
     Create("UICorner", {
-        CornerRadius = UDim.new(0, 5),
+        CornerRadius = UDim.new(0, 5), -- FIXED: UDim.new instead of UDim2.new
         Parent = TextBox
     })
 
