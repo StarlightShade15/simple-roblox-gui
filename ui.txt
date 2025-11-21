@@ -1,812 +1,780 @@
---[[
-    ExoUI Library: Core Framework Module (FIXED)
-    
-    -- FIX APPLIED: All instances of UICorner.CornerRadius were changed from 
-    -- UDim2.new(...) to UDim.new(...) to resolve the runtime error.
-]]
+-- This is the complete, self-contained, image-free library code.
+-- It resolves the Vector2/Vector3 input error and uses only native Roblox UI properties.
 
-local ExoUI = {}
-
--- Define the key services and variables
+-- Core Roblox Services
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer and LocalPlayer:WaitForChild("PlayerGui")
+local TweenService = game:GetService("TweenService")
 
-local LibraryInstance = nil -- Main ScreenGui instance
-local MainWindow = nil      -- Main Window Frame
-local CurrentTheme = "BlueNight"
+-- The main table to be returned as the module
+local ExoUI = {}
 
--- Color Palettes for themes
-local Themes = {
-    Dark = {
-        PrimaryBg = Color3.fromRGB(32, 32, 32),
-        SecondaryBg = Color3.fromRGB(40, 40, 40),
-        AccentColor = Color3.fromRGB(150, 10, 255),
-        TitleText = Color3.fromRGB(255, 255, 255),
-        ContentText = Color3.fromRGB(200, 200, 200),
-        InputBg = Color3.fromRGB(55, 55, 55),
-    },
-    Light = {
-        PrimaryBg = Color3.fromRGB(240, 240, 240),
-        SecondaryBg = Color3.fromRGB(255, 255, 255),
-        AccentColor = Color3.fromRGB(30, 144, 255),
-        TitleText = Color3.fromRGB(0, 0, 0),
-        ContentText = Color3.fromRGB(50, 50, 50),
-        InputBg = Color3.fromRGB(230, 230, 230),
-    },
-    BlueNight = {
-        PrimaryBg = Color3.fromRGB(26, 43, 60),
-        SecondaryBg = Color3.fromRGB(37, 58, 80),
-        AccentColor = Color3.fromRGB(0, 191, 255),
-        TitleText = Color3.fromRGB(230, 240, 255),
-        ContentText = Color3.fromRGB(180, 200, 220),
-        InputBg = Color3.fromRGB(45, 65, 85),
-    }
+-- Variables
+local Player = Players.LocalPlayer
+local ScreenGui = nil
+local CurrentDraggableFrame = nil
+local IsDragging = false
+local DragOffset = nil
+
+-- Configuration
+local Config = {
+    PrimaryColor = Color3.fromRGB(40, 44, 52),
+    AccentColor = Color3.fromRGB(0, 150, 255),
+    TextColor = Color3.fromRGB(255, 255, 255),
+    HeaderHeight = 35,
+    TabButtonHeight = 30,
+    Padding = 10,
+    SectionPadding = 8,
+    ControlHeight = 25,
+    Font = Enum.Font.Roboto,
+    FontSize = Enum.FontSize.Size14,
+    CornerRadius = UDim.new(0.05, 0) -- Used internally for relative sizing
 }
 
--- Utility functions
-local function ApplyTheme(themeName)
-    local theme = Themes[themeName]
-    if not theme then return end
-
-    if MainWindow then
-        MainWindow.BackgroundColor3 = theme.PrimaryBg
-        MainWindow:FindFirstChild("TitleBar").BackgroundColor3 = theme.SecondaryBg
-        
-        -- ... (Theme application logic for main frames) ...
-        
-        local TabContainer = MainWindow:FindFirstChild("TabContainer")
-        local SectionContainer = MainWindow:FindFirstChild("SectionContainer")
-        local ContentFrame = MainWindow:FindFirstChild("ContentFrame")
-        
-        if TabContainer then TabContainer.BackgroundColor3 = theme.SecondaryBg end
-        if SectionContainer then SectionContainer.BackgroundColor3 = theme.PrimaryBg end
-        if ContentFrame then ContentFrame.BackgroundColor3 = theme.PrimaryBg end
-
-        -- Update tab buttons and accent colors
-        local ActiveTabValue = MainWindow.ActiveTab.Value
-        for _, btn in TabContainer:FindFirstChild("Tabs"):GetChildren() do
-            if btn:IsA("TextButton") then
-                btn.TextColor3 = theme.ContentText
-                if btn.Name == ActiveTabValue then
-                    btn.UIStroke.Color = theme.AccentColor
-                    btn.UIStroke.Thickness = 2
-                else
-                    btn.UIStroke.Thickness = 0
-                end
-            end
-        end
-        
-        -- Update active section button accent
-        local ActiveSectionValue = MainWindow.ActiveSection.Value
-        if ActiveSectionValue ~= "" then
-            local activeTabSections = SectionContainer:FindFirstChild(ActiveTabValue .. "Sections")
-            if activeTabSections then
-                local sectionButton = activeTabSections:FindFirstChild(ActiveSectionValue)
-                if sectionButton and sectionButton:IsA("TextButton") then
-                    sectionButton.UIStroke.Color = theme.AccentColor
-                end
-            end
-        end
+-- Utility Functions
+local function Create(ClassName, Properties)
+    local instance = Instance.new(ClassName)
+    for prop, value in pairs(Properties) do
+        instance[prop] = value
     end
-    CurrentTheme = themeName
+    return instance
 end
 
-local function MakeDraggable(frame, titleBar)
-    local dragging = false
-    local dragStart = Vector2.new(0, 0)
-    local frameStart = Vector2.new(0, 0)
+-- =================================================================
+-- UI Creation Functions
+-- =================================================================
 
-    titleBar.InputBegan:Connect(function(input)
+-- 1. Main UI and Drag Logic
+function ExoUI:Init(Title)
+    -- Destroy existing GUI if it exists
+    if ScreenGui then ScreenGui:Destroy() end
+
+    ScreenGui = Create("ScreenGui", {Name = "ExoUI_MainGui", ResetOnSpawn = false})
+    ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+
+    local MainFrame = Create("Frame", {
+        Name = "MainFrame",
+        Size = UDim2.new(0, 400),
+        Position = UDim2.new(0.5, -200, 0.5, -200), -- Centered
+        BackgroundColor3 = Config.PrimaryColor,
+        BorderSizePixel = 0,
+        Parent = ScreenGui,
+    })
+
+    -- Add rounded corners (using UDim)
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 8),
+        Parent = MainFrame
+    })
+
+    -- Header Frame for Title and Dragging
+    local HeaderFrame = Create("Frame", {
+        Name = "Header",
+        Size = UDim2.new(1, 0, 0, Config.HeaderHeight),
+        BackgroundColor3 = Config.AccentColor,
+        BorderSizePixel = 0,
+        Parent = MainFrame
+    })
+
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 8),
+        Parent = HeaderFrame
+    })
+
+    -- Header Text
+    Create("TextLabel", {
+        Name = "TitleLabel",
+        Size = UDim2.new(1, -20, 1, 0),
+        Position = UDim2.new(0, Config.Padding, 0, 0),
+        Text = Title or "ExoUI",
+        Font = Config.Font,
+        TextSize = 18,
+        TextColor3 = Config.TextColor,
+        BackgroundTransparency = 1,
+        Parent = HeaderFrame,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+    
+    -- Dragging Logic (FIXED: Explicitly uses GetMouseLocation for Vector2)
+    local function StartDrag(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            frameStart = frame.AbsolutePosition
-            input:Capture()
+            IsDragging = true
+            CurrentDraggableFrame = MainFrame
+            -- Use GetMouseLocation which always returns a Vector2 screen coordinate
+            local mousePosition = UserInputService:GetMouseLocation()
+            DragOffset = mousePosition - MainFrame.Position.Offset
         end
-    end)
-
-    titleBar.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStart
-            local newPos = frameStart + delta
-            
-            local screenX = PlayerGui.AbsoluteSize.X
-            local screenY = PlayerGui.AbsoluteSize.Y
-            
-            local clampedX = math.clamp(newPos.X, 0, screenX - frame.AbsoluteSize.X)
-            local clampedY = math.clamp(newPos.Y, 0, screenY - frame.AbsoluteSize.Y)
-
-            frame.Position = UDim2.fromOffset(clampedX, clampedY)
-        end
-    end)
-end
-
-local function SetupKeybind()
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if input.KeyCode == Enum.KeyCode.RightShift and not gameProcessed then
-            if MainWindow then
-                MainWindow.Visible = not MainWindow.Visible
-            end
-        end
-    end)
-end
--- End of utility functions
-
---***********************************************************************
---** Control Creation API (Internal)
---***********************************************************************
-
--- This function returns an object containing methods to add specific controls to the parent frame.
-local function createContentAPI(parentFrame)
-    local ContentAPI = {}
-    local theme = Themes[CurrentTheme]
-    
-    -- Helper to create the base container for a single control
-    local function createControlContainer(name, height)
-        local frame = Instance.new("Frame")
-        frame.Name = name
-        frame.Size = UDim2.new(1, 0, 0, height or 40)
-        frame.BackgroundTransparency = 1
-        frame.Parent = parentFrame
-        
-        local padding = Instance.new("UIPadding")
-        padding.PaddingLeft = UDim.new(0, 10)
-        padding.PaddingRight = UDim.new(0, 10)
-        padding.Parent = frame
-        
-        return frame
-    end
-    
-    -- 1. Checkbox / Toggle
-    function ContentAPI:checkbox(featureName, defaultValue, callback)
-        local container = createControlContainer(featureName, 30)
-        
-        local nameLabel = Instance.new("TextLabel")
-        nameLabel.Text = featureName
-        nameLabel.Size = UDim2.new(0.8, 0, 1, 0)
-        nameLabel.BackgroundTransparency = 1
-        nameLabel.TextColor3 = theme.ContentText
-        nameLabel.Font = Enum.Font.SourceSans
-        nameLabel.TextSize = 15
-        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-        nameLabel.Parent = container
-
-        local toggleButton = Instance.new("TextButton")
-        toggleButton.Name = "Toggle"
-        toggleButton.Size = UDim2.new(0, 50, 0.8, 0)
-        toggleButton.Position = UDim2.new(1, -50, 0.1, 0)
-        toggleButton.Font = Enum.Font.SourceSansBold
-        toggleButton.TextSize = 14
-        toggleButton.TextColor3 = theme.TitleText
-        toggleButton.Parent = container
-        
-        local corner = Instance.new("UICorner")
-        -- FIX: UDim2.new(0, 4) -> UDim.new(0, 4)
-        corner.CornerRadius = UDim.new(0, 4)
-        corner.Parent = toggleButton
-        
-        local currentState = defaultValue or false
-
-        local function updateToggleVisuals()
-            if currentState then
-                toggleButton.Text = "ON"
-                toggleButton.BackgroundColor3 = theme.AccentColor
-            else
-                toggleButton.Text = "OFF"
-                toggleButton.BackgroundColor3 = theme.SecondaryBg
-            end
-        end
-        
-        toggleButton.MouseButton1Click:Connect(function()
-            currentState = not currentState
-            updateToggleVisuals()
-            if callback then callback(currentState) end
-        end)
-        
-        updateToggleVisuals() -- Set initial state visuals
-        
-        return container -- Return the container for direct reference if needed
     end
 
-    -- 2. Slider
-    function ContentAPI:slider(featureName, min, max, initialValue, step, callback)
-        min = min or 0
-        max = max or 100
-        initialValue = math.clamp(initialValue or 50, min, max)
-        step = step or 1
-        
-        local container = createControlContainer(featureName .. "Slider", 50)
-
-        local header = Instance.new("TextLabel")
-        header.Text = featureName .. ": " .. string.format("%.1f", initialValue)
-        header.Name = "ValueLabel"
-        header.Size = UDim2.new(1, 0, 0.4, 0)
-        header.BackgroundTransparency = 1
-        header.TextColor3 = theme.ContentText
-        header.Font = Enum.Font.SourceSans
-        header.TextSize = 15
-        header.TextXAlignment = Enum.TextXAlignment.Left
-        header.Parent = container
-
-        local sliderFrame = Instance.new("Frame")
-        sliderFrame.Size = UDim2.new(1, 0, 0.3, 0)
-        sliderFrame.Position = UDim2.new(0, 0, 0.6, 0)
-        sliderFrame.BackgroundColor3 = theme.InputBg
-        sliderFrame.Parent = container
-        
-        local corner = Instance.new("UICorner")
-        -- FIX: UDim2.new(0, 4) -> UDim.new(0, 4)
-        corner.CornerRadius = UDim.new(0, 4)
-        corner.Parent = sliderFrame
-
-        local valueIndicator = Instance.new("Frame")
-        valueIndicator.Name = "Indicator"
-        valueIndicator.Size = UDim2.new(0, 0, 1, 0)
-        valueIndicator.BackgroundColor3 = theme.AccentColor
-        valueIndicator.Parent = sliderFrame
-        
-        local thumb = Instance.new("Frame")
-        thumb.Size = UDim2.new(0, 10, 0, 20)
-        thumb.Position = UDim2.new(0, -5, 0.5, -10)
-        thumb.BackgroundColor3 = theme.TitleText
-        thumb.Parent = sliderFrame
-        
-        local thumbCorner = Instance.new("UICorner")
-        -- FIX: UDim2.new(0.5, 0) -> UDim.new(0.5, 0)
-        thumbCorner.CornerRadius = UDim.new(0.5, 0)
-        thumbCorner.Parent = thumb
-        
-        local isDragging = false
-        local currentValue = initialValue
-        
-        local function updateSliderVisuals(value)
-            currentValue = value
-            local ratio = (value - min) / (max - min)
-            local width = math.clamp(ratio, 0, 1)
+    local function DoDrag()
+        if IsDragging and CurrentDraggableFrame then
+            -- Use GetMouseLocation to avoid Vector3 from InputChanged events (e.g., from touch/gamepad)
+            local mousePosition = UserInputService:GetMouseLocation()
             
-            valueIndicator.Size = UDim2.new(width, 0, 1, 0)
-            thumb.Position = UDim2.new(width, -5, 0.5, -10)
-            
-            header.Text = featureName .. ": " .. string.format("%.1f", value)
+            local newPosition = mousePosition - DragOffset
+            CurrentDraggableFrame.Position = UDim2.new(0, newPosition.X, 0, newPosition.Y)
         end
-        
-        local function getClampedValue(x)
-            local pixelWidth = sliderFrame.AbsoluteSize.X
-            local ratio = math.clamp(x / pixelWidth, 0, 1)
-            local rawValue = min + ratio * (max - min)
-            
-            -- Apply step rounding
-            if step > 0 then
-                rawValue = math.round(rawValue / step) * step
-            end
-            
-            return math.clamp(rawValue, min, max)
-        end
-
-        local function handleInput(input)
-            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-                local localPos = input.Position - sliderFrame.AbsolutePosition
-                local newValue = getClampedValue(localPos.X)
-                
-                updateSliderVisuals(newValue)
-                if callback then callback(newValue) end
-            end
-        end
-        
-        thumb.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                isDragging = true
-                input:Capture()
-                handleInput(input)
-            end
-        end)
-        
-        UserInputService.InputChanged:Connect(function(input)
-            if isDragging then
-                handleInput(input)
-            end
-        end)
-        
-        UserInputService.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                isDragging = false
-            end
-        end)
-        
-        updateSliderVisuals(initialValue) -- Initial draw
-        
-        return container
-    end
-    
-    -- 3. Dropdown
-    function ContentAPI:dropdown(featureName, options, initialOption, callback)
-        if type(options) ~= 'table' or #options == 0 then error("Dropdown must be provided a non-empty table of options.") end
-
-        local container = createControlContainer(featureName .. "Dropdown", 40)
-        local currentOption = initialOption or options[1]
-        local isExpanded = false
-        
-        local mainButton = Instance.new("TextButton")
-        mainButton.Text = featureName .. ": " .. currentOption
-        mainButton.Size = UDim2.new(1, 0, 1, 0)
-        mainButton.BackgroundColor3 = theme.InputBg
-        mainButton.TextColor3 = theme.ContentText
-        mainButton.Font = Enum.Font.SourceSans
-        mainButton.TextSize = 14
-        mainButton.Parent = container
-
-        local corner = Instance.new("UICorner")
-        -- FIX: UDim2.new(0, 4) -> UDim.new(0, 4)
-        corner.CornerRadius = UDim.new(0, 4)
-        corner.Parent = mainButton
-        
-        -- Dropdown options panel (separate frame, visible on click)
-        local optionsPanel = Instance.new("ScrollingFrame")
-        optionsPanel.Name = "OptionsPanel"
-        optionsPanel.Size = UDim2.new(1, 0, 0, math.min(150, #options * 25))
-        optionsPanel.Position = UDim2.new(0, 0, 1, 5) -- Position below the main button
-        optionsPanel.BackgroundColor3 = theme.SecondaryBg
-        optionsPanel.CanvasSize = UDim2.new(0, 0, 0, #options * 25)
-        optionsPanel.Visible = false
-        optionsPanel.ZIndex = 2
-        optionsPanel.Parent = parentFrame -- Parented to the ContentFrame, not the control container, for ZIndex and visibility
-
-        local optionsLayout = Instance.new("UIListLayout")
-        optionsLayout.Padding = UDim.new(0, 1)
-        optionsLayout.FillDirection = Enum.FillDirection.Vertical
-        optionsLayout.Parent = optionsPanel
-
-        local function collapseDropdown()
-            isExpanded = false
-            optionsPanel.Visible = false
-        end
-
-        local function updateValue(option)
-            currentOption = option
-            mainButton.Text = featureName .. ": " .. currentOption
-            if callback then callback(currentOption) end
-            collapseDropdown()
-        end
-        
-        for i, option in ipairs(options) do
-            local optionButton = Instance.new("TextButton")
-            optionButton.Text = option
-            optionButton.Size = UDim2.new(1, 0, 0, 25)
-            optionButton.BackgroundColor3 = theme.SecondaryBg
-            optionButton.TextColor3 = theme.ContentText
-            optionButton.Font = Enum.Font.SourceSans
-            optionButton.TextSize = 14
-            optionButton.Parent = optionsPanel
-            
-            optionButton.MouseEnter:Connect(function() optionButton.BackgroundColor3 = theme.InputBg end)
-            optionButton.MouseLeave:Connect(function() optionButton.BackgroundColor3 = theme.SecondaryBg end)
-
-            optionButton.MouseButton1Click:Connect(function()
-                updateValue(option)
-            end)
-        end
-        
-        mainButton.MouseButton1Click:Connect(function()
-            isExpanded = not isExpanded
-            optionsPanel.Visible = isExpanded
-        end)
-        
-        updateValue(currentOption)
-        return container
     end
 
-    -- 4. Textbox
-    function ContentAPI:textbox(featureName, placeholder, initialText, callback)
-        local container = createControlContainer(featureName .. "Textbox", 60)
-
-        local nameLabel = Instance.new("TextLabel")
-        nameLabel.Text = featureName
-        nameLabel.Size = UDim2.new(1, 0, 0.4, 0)
-        nameLabel.BackgroundTransparency = 1
-        nameLabel.TextColor3 = theme.ContentText
-        nameLabel.Font = Enum.Font.SourceSans
-        nameLabel.TextSize = 15
-        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-        nameLabel.Parent = container
-
-        local input = Instance.new("TextBox")
-        input.Name = "Input"
-        input.PlaceholderText = placeholder or ""
-        input.Text = initialText or ""
-        input.Size = UDim2.new(1, 0, 0.5, 0)
-        input.Position = UDim2.new(0, 0, 0.5, 0)
-        input.BackgroundColor3 = theme.InputBg
-        input.TextColor3 = theme.TitleText
-        input.Font = Enum.Font.SourceSans
-        input.TextSize = 14
-        input.Parent = container
-        
-        local corner = Instance.new("UICorner")
-        -- FIX: UDim2.new(0, 4) -> UDim.new(0, 4)
-        corner.CornerRadius = UDim.new(0, 4)
-        corner.Parent = input
-
-        local stroke = Instance.new("UIStroke")
-        stroke.Thickness = 1
-        stroke.Color = theme.InputBg
-        stroke.Parent = input
-        
-        -- Highlight border on focus
-        input.Focused:Connect(function()
-            stroke.Color = theme.AccentColor
-        end)
-        
-        input.FocusLost:Connect(function(enterPressed)
-            stroke.Color = theme.InputBg
-            if enterPressed and callback then
-                callback(input.Text)
-            elseif not enterPressed and callback then
-                -- Optional: call callback even if user just clicks away
-                -- callback(input.Text)
-            end
-        end)
-        
-        return container
-    end
-    
-    return ContentAPI
-end
-
-
--- Public method for creating and registering new tabs
-function ExoUI:CreateTab(tabName, isDefault)
-    if not MainWindow then
-        error("ExoUI:CreateTab called before Init()")
-        return nil
+    local function EndDrag()
+        IsDragging = false
+        CurrentDraggableFrame = nil
+        DragOffset = nil
     end
 
-    local TabsFrame = MainWindow:FindFirstChild("TabContainer"):FindFirstChild("Tabs")
-    local SectionContainer = MainWindow:FindFirstChild("SectionContainer")
-    local ContentFrame = MainWindow:FindFirstChild("ContentFrame")
-    local ActiveTab = MainWindow.ActiveTab
-    local ActiveSection = MainWindow.ActiveSection
-    
-    local isFirstTab = ActiveTab.Value == ""
-    local shouldBeVisible = isDefault or isFirstTab
-    
-    -- 1. Create container for this tab's sections
-    local tabSectionsFrame = Instance.new("Frame")
-    tabSectionsFrame.Name = tabName .. "Sections"
-    -- ... (Layout properties) ...
-    tabSectionsFrame.Size = UDim2.new(1, 0, 1, 0)
-    tabSectionsFrame.BackgroundTransparency = 1
-    tabSectionsFrame.Parent = SectionContainer
-    tabSectionsFrame.Visible = shouldBeVisible
-    
-    local sectionListLayout = Instance.new("UIListLayout")
-    sectionListLayout.Padding = UDim.new(0, 5)
-    sectionListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    sectionListLayout.Parent = tabSectionsFrame
-    
-    local sectionPadding = Instance.new("UIPadding")
-    sectionPadding.PaddingLeft = UDim.new(0, 5)
-    sectionPadding.PaddingRight = UDim.new(0, 5)
-    sectionPadding.PaddingTop = UDim.new(0, 5)
-    sectionPadding.PaddingBottom = UDim.new(0, 5)
-    sectionPadding.Parent = tabSectionsFrame
-    
-    local firstSectionName = nil
-    
-    -- 2. Define the AddSection function (now named 'section' in the object)
-    local function AddSection(_, sectionName, sectionOrder)
-        local theme = Themes[CurrentTheme]
-        
-        -- a. Create Content Frame for the section
-        local sectionContentFrame = Instance.new("ScrollingFrame") -- Use ScrollingFrame for content
-        sectionContentFrame.Name = tabName .. "_" .. sectionName .. "_Content"
-        sectionContentFrame.Size = UDim2.new(1, 0, 1, 0)
-        sectionContentFrame.BackgroundTransparency = 1
-        sectionContentFrame.Parent = ContentFrame
-        sectionContentFrame.Visible = false
-        sectionContentFrame.ScrollBarImageColor3 = theme.AccentColor -- Fancy scrollbar
-        sectionContentFrame.CanvasSize = UDim2.new(0, 0, 0, 0) -- Will be updated dynamically by ListLayout
-        
-        local contentListLayout = Instance.new("UIListLayout")
-        contentListLayout.Name = "ContentLayout"
-        contentListLayout.Padding = UDim.new(0, 10)
-        contentListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-        contentListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
-        contentListLayout.Parent = sectionContentFrame
-        
-        local contentPadding = Instance.new("UIPadding")
-        contentPadding.PaddingTop = UDim.new(0, 10)
-        contentPadding.PaddingBottom = UDim.new(0, 10)
-        contentPadding.Parent = sectionContentFrame
-        
-        -- Update CanvasSize whenever the layout changes
-        contentListLayout.DidUpdate:Connect(function()
-            local contentHeight = 0
-            for _, child in sectionContentFrame:GetChildren() do
-                if child:IsA("Frame") and child.Visible then
-                    contentHeight = contentHeight + child.Size.Y.Offset + contentListLayout.Padding.Offset
-                end
-            end
-            sectionContentFrame.CanvasSize = UDim2.new(0, 0, 0, contentHeight + contentPadding.PaddingTop.Offset + contentPadding.PaddingBottom.Offset)
-        end)
-        
-        -- b. Create Section Button
-        -- ... (Section button creation logic) ...
-        local sectionButton = Instance.new("TextButton")
-        sectionButton.Name = sectionName
-        sectionButton.Text = sectionName
-        sectionButton.Size = UDim2.new(1, 0, 0, 30)
-        sectionButton.BackgroundColor3 = theme.PrimaryBg
-        sectionButton.TextColor3 = theme.ContentText
-        sectionButton.Font = Enum.Font.SourceSans
-        sectionButton.TextSize = 14
-        sectionButton.LayoutOrder = sectionOrder or 0
-        sectionButton.Parent = tabSectionsFrame
-        
-        local corner = Instance.new("UICorner")
-        -- FIX: UDim2.new(0, 4) -> UDim.new(0, 4)
-        corner.CornerRadius = UDim.new(0, 4)
-        corner.Parent = sectionButton
+    HeaderFrame.InputBegan:Connect(StartDrag)
+    UserInputService.InputChanged:Connect(DoDrag)
+    UserInputService.InputEnded:Connect(EndDrag)
 
-        local stroke = Instance.new("UIStroke")
-        stroke.Thickness = 0
-        stroke.Color = theme.AccentColor
-        stroke.Parent = sectionButton
-        
-        if not firstSectionName then 
-            firstSectionName = sectionName 
-            if shouldBeVisible then
-                sectionContentFrame.Visible = true
-                ActiveSection.Value = sectionName
-                stroke.Thickness = 2
-            end
-        end
 
-        -- c. Connect Section Button Logic
-        sectionButton.MouseButton1Click:Connect(function()
-            -- ... (Section visibility and highlighting logic) ...
-            for _, btn in tabSectionsFrame:GetChildren() do
-                if btn:IsA("TextButton") then
-                    btn.UIStroke.Thickness = 0
-                end
-            end
-            
-            stroke.Thickness = 2
-            
-            for _, frame in ContentFrame:GetChildren() do
-                if frame:IsA("ScrollingFrame") then
-                    frame.Visible = false
-                end
-            end
-            
-            sectionContentFrame.Visible = true
-            ActiveSection.Value = sectionName
-        end)
-        
-        -- Return the Content API for fluent control creation
-        return createContentAPI(sectionContentFrame) 
-    end
-    
-    -- 3. Create Tab Button
-    -- ... (Tab button creation logic) ...
-    local tabButton = Instance.new("TextButton")
-    tabButton.Name = tabName
-    tabButton.Text = tabName
-    tabButton.Size = UDim2.new(1, 0, 0, 40)
-    tabButton.BackgroundColor3 = Themes[CurrentTheme].SecondaryBg
-    tabButton.TextColor3 = Themes[CurrentTheme].ContentText
-    tabButton.Font = Enum.Font.SourceSansBold
-    tabButton.TextSize = 16
-    tabButton.Parent = TabsFrame
-    
-    local corner = Instance.new("UICorner")
-    -- FIX: UDim2.new(0, 4) -> UDim.new(0, 4)
-    corner.CornerRadius = UDim.new(0, 4)
-    corner.Parent = tabButton
+    -- Layout for Tabs and Content
+    local TabContainer = Create("Frame", {
+        Name = "TabContainer",
+        Size = UDim2.new(0.25, 0, 1, -Config.HeaderHeight),
+        Position = UDim2.new(0, 0, 0, Config.HeaderHeight),
+        BackgroundColor3 = Config.PrimaryColor,
+        BorderSizePixel = 0,
+        Parent = MainFrame
+    })
 
-    local stroke = Instance.new("UIStroke")
-    stroke.Thickness = shouldBeVisible and 2 or 0
-    stroke.Color = Themes[CurrentTheme].AccentColor
-    stroke.Parent = tabButton
-    
-    tabButton.LayoutOrder = (tabName == "Settings") and 999 or 0 
+    local ContentContainer = Create("Frame", {
+        Name = "ContentContainer",
+        Size = UDim2.new(0.75, 0, 1, -Config.HeaderHeight),
+        Position = UDim2.new(0.25, 0, 0, Config.HeaderHeight),
+        BackgroundColor3 = Config.PrimaryColor,
+        BorderSizePixel = 0,
+        Parent = MainFrame
+    })
 
-    -- 4. Connect Tab Button Logic
-    tabButton.MouseButton1Click:Connect(function()
-        -- ... (Tab logic) ...
-        for _, btn in tabButton.Parent:GetChildren() do
-            if btn:IsA("TextButton") then
-                btn.UIStroke.Thickness = 0
-            end
-        end
-        stroke.Thickness = 2
-        
-        MainWindow.SettingsOpen.Value = false
-        
-        ActiveTab.Value = tabName
-        for _, frame in SectionContainer:GetChildren() do
-            if frame:IsA("Frame") then frame.Visible = false end
-        end
-        tabSectionsFrame.Visible = true
-        
-        local currentActiveSection = ActiveSection.Value
-        local firstSectionButton = tabSectionsFrame:FindFirstChild(firstSectionName)
-        
-        if firstSectionButton and (not ContentFrame:FindFirstChild(tabName .. "_" .. firstSectionName .. "_Content").Visible or currentActiveSection ~= firstSectionName) then
-            firstSectionButton:Click()
-        end
-        
-    end)
+    -- UIListLayout for tabs
+    Create("UIListLayout", {
+        Name = "TabListLayout",
+        Padding = UDim.new(0, 5),
+        HorizontalAlignment = Enum.HorizontalAlignment.Center,
+        VerticalAlignment = Enum.VerticalAlignment.Top,
+        Parent = TabContainer,
+        SortOrder = Enum.SortOrder.LayoutOrder
+    })
     
-    -- 5. Return the Tab Object
-    local tabObject = {
-        section = AddSection,
+    -- UIPadding for the content container
+    Create("UIPadding", {
+        PaddingTop = UDim.new(0, Config.Padding),
+        PaddingBottom = UDim.new(0, Config.Padding),
+        PaddingLeft = UDim.new(0, Config.Padding),
+        PaddingRight = UDim.new(0, Config.Padding),
+        Parent = ContentContainer
+    })
+
+    -- Add a property to the module to hold the main containers
+    ExoUI.Containers = {
+        MainFrame = MainFrame,
+        TabContainer = TabContainer,
+        ContentContainer = ContentContainer
     }
     
-    return tabObject 
+    ExoUI.Tabs = {}
+    ExoUI.CurrentTabContent = nil
+    
+    return MainFrame
 end
 
--- Initialization function (Creates ALL scaffolding)
-function ExoUI:Init(title)
-    if LibraryInstance then return end
-    if not PlayerGui then return end
+-- 2. Tab Creation
+function ExoUI:CreateTab(Name, IsDefault)
+    local tabContainer = ExoUI.Containers.TabContainer
+    local contentContainer = ExoUI.Containers.ContentContainer
     
-    LibraryInstance = Instance.new("ScreenGui")
-    LibraryInstance.Name = "ExoUILibrary"
-    LibraryInstance.DisplayOrder = 999
-    LibraryInstance.Parent = PlayerGui
+    -- Tab Button
+    local TabButton = Create("TextButton", {
+        Name = Name .. "TabButton",
+        Text = Name,
+        Size = UDim2.new(1, -10, 0, Config.TabButtonHeight),
+        BackgroundColor3 = Config.PrimaryColor,
+        TextColor3 = Config.TextColor,
+        Font = Config.Font,
+        TextSize = 16,
+        BorderSizePixel = 0,
+        Parent = tabContainer,
+        LayoutOrder = #tabContainer:GetChildren()
+    })
     
-    MainWindow = Instance.new("Frame")
-    MainWindow.Name = "MainWindow"
-    MainWindow.Size = UDim2.new(0, 600, 0, 400)
-    MainWindow.Position = UDim2.new(0.5, -300, 0.5, -200)
-    MainWindow.BackgroundColor3 = Themes[CurrentTheme].PrimaryBg
-    MainWindow.Parent = LibraryInstance
-    
-    local corner = Instance.new("UICorner")
-    -- FIX: UDim2.new(0, 8) -> UDim.new(0, 8)
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = MainWindow
-    
-    local padding = Instance.new("UIPadding")
-    padding.PaddingTop = UDim.new(0, 30)
-    padding.Parent = MainWindow
-    
-    -- Title Bar setup
-    local TitleBar = Instance.new("Frame")
-    TitleBar.Name = "TitleBar"
-    TitleBar.Size = UDim2.new(1, 0, 0, 30)
-    TitleBar.BackgroundColor3 = Themes[CurrentTheme].SecondaryBg
-    TitleBar.Parent = MainWindow
-    MakeDraggable(MainWindow, TitleBar)
+    -- Tab Content Frame
+    local TabContent = Create("Frame", {
+        Name = Name .. "TabContent",
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Visible = IsDefault or false,
+        Parent = contentContainer
+    })
 
-    local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Name = "TitleLabel"
-    TitleLabel.Text = title or "ExoUI Library"
-    TitleLabel.Size = UDim2.new(1, -120, 1, 0)
-    TitleLabel.Position = UDim2.new(0, 40, 0, 0)
-    TitleLabel.BackgroundTransparency = 1
-    TitleLabel.TextColor3 = Themes[CurrentTheme].TitleText
-    TitleLabel.Font = Enum.Font.SourceSansBold
-    TitleLabel.TextSize = 18
-    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TitleLabel.Parent = TitleBar
-    
-    -- Controls (X and -)
-    local Controls = Instance.new("Frame")
-    Controls.Name = "Controls"
-    Controls.Size = UDim2.new(0, 80, 1, 0)
-    Controls.Position = UDim2.new(1, -80, 0, 0)
-    Controls.BackgroundTransparency = 1
-    Controls.Parent = TitleBar
-    
-    local ControlsList = Instance.new("UIListLayout")
-    ControlsList.Padding = UDim.new(0, 5)
-    ControlsList.FillDirection = Enum.FillDirection.Horizontal
-    ControlsList.VerticalAlignment = Enum.VerticalAlignment.Center
-    ControlsList.HorizontalAlignment = Enum.HorizontalAlignment.Right
-    ControlsList.Parent = Controls
-    
-    local CloseButton = Instance.new("TextButton")
-    CloseButton.Name = "CloseButton"
-    CloseButton.Text = "X"
-    CloseButton.Size = UDim2.new(0, 20, 0, 20)
-    CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    CloseButton.TextColor3 = Themes[CurrentTheme].ContentText
-    CloseButton.Font = Enum.Font.SourceSansBold
-    CloseButton.TextSize = 15
-    CloseButton.Parent = Controls
-    local CloseCorner = Instance.new("UICorner")
-    CloseCorner.CornerRadius = UDim.new(0.5, 0) -- This one was already correct
-    CloseCorner.Parent = CloseButton
-    CloseButton.MouseButton1Click:Connect(function() LibraryInstance:Destroy() end)
-    
-    local MinimizeButton = Instance.new("TextButton")
-    MinimizeButton.Name = "MinimizeButton"
-    MinimizeButton.Text = "-"
-    MinimizeButton.Size = UDim2.new(0, 20, 0, 20)
-    MinimizeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    MinimizeButton.TextColor3 = Themes[CurrentTheme].ContentText
-    MinimizeButton.Font = Enum.Font.SourceSansBold
-    MinimizeButton.TextSize = 15
-    MinimizeButton.Parent = Controls
-    local MinimizeCorner = Instance.new("UICorner")
-    MinimizeCorner.CornerRadius = UDim.new(0.5, 0) -- This one was already correct
-    MinimizeCorner.Parent = MinimizeButton
-    MinimizeButton.MouseButton1Click:Connect(function() MainWindow.Visible = false end)
-    
-    -- Value trackers (ActiveTab, ActiveSection, SettingsOpen)
-    
-    local ActiveTab = Instance.new("StringValue")
-    ActiveTab.Name = "ActiveTab"
-    ActiveTab.Value = "" 
-    ActiveTab.Parent = MainWindow
+    -- UIListLayout for sections in content
+    local ContentLayout = Create("UIListLayout", {
+        Name = "ContentLayout",
+        Padding = UDim.new(0, Config.Padding),
+        HorizontalAlignment = Enum.HorizontalAlignment.Left,
+        VerticalAlignment = Enum.VerticalAlignment.Top,
+        FillDirection = Enum.FillDirection.Vertical,
+        Parent = TabContent,
+        SortOrder = Enum.SortOrder.LayoutOrder
+    })
 
-    local ActiveSection = Instance.new("StringValue")
-    ActiveSection.Name = "ActiveSection"
-    ActiveSection.Value = "" 
-    ActiveSection.Parent = MainWindow
+    -- Select Tab Logic
+    local function SelectTab()
+        -- Hide all other content frames
+        for _, tab in pairs(ExoUI.Tabs) do
+            tab.Content.Visible = false
+            -- Reset button appearance
+            tab.Button.BackgroundColor3 = Config.PrimaryColor
+        end
+        
+        -- Show current content and highlight button
+        TabContent.Visible = true
+        TabButton.BackgroundColor3 = Config.AccentColor
+        ExoUI.CurrentTabContent = TabContent
+    end
     
-    local SettingsOpen = Instance.new("BoolValue")
-    SettingsOpen.Name = "SettingsOpen"
-    SettingsOpen.Value = false
-    SettingsOpen.Parent = MainWindow
+    TabButton.MouseButton1Click:Connect(SelectTab)
     
-    -- Layout Frames (TabContainer, SectionContainer, ContentFrame)
-    local TabContainer = Instance.new("Frame")
-    TabContainer.Name = "TabContainer"
-    TabContainer.Size = UDim2.new(0.2, 0, 1, -30)
-    TabContainer.Position = UDim2.new(0, 0, 0, 30)
-    TabContainer.BackgroundColor3 = Themes[CurrentTheme].SecondaryBg
-    TabContainer.Parent = MainWindow
-    
-    local SectionContainer = Instance.new("Frame")
-    SectionContainer.Name = "SectionContainer"
-    SectionContainer.Size = UDim2.new(0.2, 0, 1, -30)
-    SectionContainer.Position = UDim2.new(0.2, 0, 0, 30)
-    SectionContainer.BackgroundColor3 = Themes[CurrentTheme].PrimaryBg
-    SectionContainer.Parent = MainWindow
+    -- Set default tab
+    if IsDefault then
+        SelectTab()
+    elseif not ExoUI.CurrentTabContent then
+        -- If no default is set, set the first tab as visible
+        TabContent.Visible = true
+        TabButton.BackgroundColor3 = Config.AccentColor
+        ExoUI.CurrentTabContent = TabContent
+    end
 
-    local ContentFrame = Instance.new("Frame") -- This frame holds all ScrollingFrames for sections
-    ContentFrame.Name = "ContentFrame"
-    ContentFrame.Size = UDim2.new(0.6, 0, 1, -30)
-    ContentFrame.Position = UDim2.new(0.4, 0, 0, 30)
-    ContentFrame.BackgroundColor3 = Themes[CurrentTheme].PrimaryBg
-    ContentFrame.Parent = MainWindow
+    local tabTable = {
+        Name = Name,
+        Button = TabButton,
+        Content = TabContent,
+        Sections = {},
+        section = function(self, sectionName, layoutOrder)
+            return self:_CreateSection(sectionName, layoutOrder)
+        end,
+        _CreateSection = function(self, sectionName, layoutOrder)
+            return self:_CreateSection(sectionName, layoutOrder)
+        end
+    }
     
-    -- Tabs Sub-Panel
-    local TabsFrame = Instance.new("Frame")
-    TabsFrame.Name = "Tabs"
-    TabsFrame.Size = UDim2.new(1, 0, 1, 0)
-    TabsFrame.BackgroundTransparency = 1
-    TabsFrame.Parent = TabContainer
+    -- Add Section Creation Method to Tab Table
+    function tabTable:_CreateSection(sectionName, layoutOrder)
+        local SectionFrame = Create("Frame", {
+            Name = sectionName:gsub("%s+", "_") .. "Section",
+            Size = UDim2.new(1, 0, 0, 0), -- Size will be determined by its children
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+            Parent = TabContent,
+            LayoutOrder = layoutOrder or #TabContent:GetChildren()
+        })
 
-    local TabsLayout = Instance.new("UIListLayout")
-    TabsLayout.Padding = UDim.new(0, 5)
-    TabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    TabsLayout.Parent = TabsFrame
-    
-    local TabPadding = Instance.new("UIPadding")
-    TabPadding.PaddingLeft = UDim.new(0, 5)
-    TabPadding.PaddingRight = UDim.new(0, 5)
-    TabPadding.PaddingTop = UDim.new(0, 5)
-    TabPadding.PaddingBottom = UDim.new(0, 5)
-    TabPadding.Parent = TabsFrame
-    
-    -- Setup Keybind
-    SetupKeybind()
-    
-    -- Apply the initial theme
-    ApplyTheme(CurrentTheme)
+        -- Section Title
+        local TitleLabel = Create("TextLabel", {
+            Name = "SectionTitle",
+            Text = sectionName,
+            Size = UDim2.new(1, 0, 0, 20),
+            Position = UDim2.new(0, 0, 0, 0),
+            Font = Config.Font,
+            TextSize = 15,
+            TextColor3 = Config.AccentColor,
+            BackgroundTransparency = 1,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Parent = SectionFrame
+        })
+        
+        -- Control Container
+        local Controls = Create("Frame", {
+            Name = "ControlsContainer",
+            Size = UDim2.new(1, 0, 1, -TitleLabel.Size.Y.Offset),
+            Position = UDim2.new(0, 0, 0, TitleLabel.Size.Y.Offset),
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+            Parent = SectionFrame
+        })
 
-    return ExoUI
+        local ControlsLayout = Create("UIListLayout", {
+            Name = "ControlsLayout",
+            Padding = UDim.new(0, Config.SectionPadding),
+            HorizontalAlignment = Enum.HorizontalAlignment.Left,
+            VerticalAlignment = Enum.VerticalAlignment.Top,
+            FillDirection = Enum.FillDirection.Vertical,
+            Parent = Controls,
+            SortOrder = Enum.SortOrder.LayoutOrder
+        })
+        
+        -- Automatic sizing based on content
+        ControlsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            SectionFrame.Size = UDim2.new(1, 0, 0, ControlsLayout.AbsoluteContentSize.Y + TitleLabel.Size.Y.Offset)
+        end)
+        
+        -- Initial size update
+        SectionFrame.Size = UDim2.new(1, 0, 0, ControlsLayout.AbsoluteContentSize.Y + TitleLabel.Size.Y.Offset)
+
+
+        local sectionTable = {
+            Name = sectionName,
+            Frame = SectionFrame,
+            Controls = Controls,
+            ControlsLayout = ControlsLayout
+        }
+
+        -- Add Control Creation Methods
+        function sectionTable:checkbox(controlName, defaultValue, callback)
+            return self:_CreateCheckbox(controlName, defaultValue, callback)
+        end
+        function sectionTable:slider(controlName, min, max, defaultValue, increment, callback)
+            return self:_CreateSlider(controlName, min, max, defaultValue, increment, callback)
+        end
+        function sectionTable:dropdown(controlName, options, defaultValue, callback)
+            return self:_CreateDropdown(controlName, options, defaultValue, callback)
+        end
+        function sectionTable:textbox(controlName, placeholder, defaultValue, callback)
+            return self:_CreateTextbox(controlName, placeholder, defaultValue, callback)
+        end
+        
+        -- Store section
+        table.insert(self.Sections, sectionTable)
+        return sectionTable
+    end
+    
+    ExoUI.Tabs[Name] = tabTable
+    return tabTable
 end
 
+-- =================================================================
+-- Control Creation Methods
+-- =================================================================
+
+-- 3. Checkbox
+function tabTable:_CreateCheckbox(controlName, defaultValue, callback)
+    local SectionFrame = self.Controls
+    
+    local ControlFrame = Create("Frame", {
+        Name = controlName:gsub("%s+", "_") .. "Control",
+        Size = UDim2.new(1, 0, 0, Config.ControlHeight),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Parent = SectionFrame
+    })
+    
+    -- Label
+    Create("TextLabel", {
+        Name = "Label",
+        Text = controlName,
+        Size = UDim2.new(1, -(Config.ControlHeight + Config.Padding), 1, 0),
+        Position = UDim2.new(0, 0, 0, 0),
+        Font = Config.Font,
+        TextSize = 14,
+        TextColor3 = Config.TextColor,
+        BackgroundTransparency = 1,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = ControlFrame
+    })
+    
+    local currentState = defaultValue
+    
+    -- Checkbox Button
+    local CheckButton = Create("TextButton", {
+        Name = "CheckButton",
+        Text = "",
+        Size = UDim2.new(0, Config.ControlHeight, 0, Config.ControlHeight),
+        Position = UDim2.new(1, -Config.ControlHeight, 0, 0),
+        BackgroundColor3 = Config.PrimaryColor,
+        BorderSizePixel = 0,
+        Parent = ControlFrame
+    })
+    
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 5),
+        Parent = CheckButton
+    })
+    
+    -- Checkmark visual (using a Frame, no images)
+    local Checkmark = Create("Frame", {
+        Name = "Checkmark",
+        Size = UDim2.new(0.6, 0, 0.6, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = Config.AccentColor,
+        BorderSizePixel = 0,
+        Visible = currentState,
+        Parent = CheckButton
+    })
+
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 3),
+        Parent = Checkmark
+    })
+
+    local function updateVisuals()
+        Checkmark.Visible = currentState
+        callback(currentState)
+    end
+    
+    local function onClick()
+        currentState = not currentState
+        updateVisuals()
+    end
+    
+    CheckButton.MouseButton1Click:Connect(onClick)
+    
+    -- Initial callback
+    pcall(callback, currentState)
+    
+    return ControlFrame
+end
+
+-- 4. Slider
+function tabTable:_CreateSlider(controlName, min, max, defaultValue, increment, callback)
+    local SectionFrame = self.Controls
+
+    local ControlFrame = Create("Frame", {
+        Name = controlName:gsub("%s+", "_") .. "Control",
+        Size = UDim2.new(1, 0, 0, Config.ControlHeight * 2),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Parent = SectionFrame
+    })
+    
+    local currentValue = defaultValue
+    
+    -- Label and Value Display
+    local LabelValueFrame = Create("Frame", {
+        Name = "LabelValueFrame",
+        Size = UDim2.new(1, 0, 0, Config.ControlHeight),
+        BackgroundTransparency = 1,
+        Parent = ControlFrame
+    })
+
+    Create("TextLabel", {
+        Name = "Label",
+        Text = controlName,
+        Size = UDim2.new(0.7, 0, 1, 0),
+        Position = UDim2.new(0, 0, 0, 0),
+        Font = Config.Font,
+        TextSize = 14,
+        TextColor3 = Config.TextColor,
+        BackgroundTransparency = 1,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = LabelValueFrame
+    })
+
+    local ValueLabel = Create("TextLabel", {
+        Name = "Value",
+        Text = string.format("%.1f", currentValue),
+        Size = UDim2.new(0.3, 0, 1, 0),
+        Position = UDim2.new(0.7, 0, 0, 0),
+        Font = Config.Font,
+        TextSize = 14,
+        TextColor3 = Config.AccentColor,
+        BackgroundTransparency = 1,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        Parent = LabelValueFrame
+    })
+    
+    -- Slider Background
+    local SliderFrame = Create("Frame", {
+        Name = "SliderFrame",
+        Size = UDim2.new(1, 0, 0, Config.ControlHeight),
+        Position = UDim2.new(0, 0, 0, Config.ControlHeight),
+        BackgroundTransparency = 1,
+        Parent = ControlFrame
+    })
+    
+    local BackgroundBar = Create("Frame", {
+        Name = "BackgroundBar",
+        Size = UDim2.new(1, 0, 0, 4),
+        Position = UDim2.new(0, 0, 0.5, -2),
+        BackgroundColor3 = Config.PrimaryColor,
+        BorderSizePixel = 0,
+        Parent = SliderFrame
+    })
+    
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 2),
+        Parent = BackgroundBar
+    })
+    
+    -- Fill Bar
+    local FillBar = Create("Frame", {
+        Name = "FillBar",
+        Size = UDim2.new((currentValue - min) / (max - min), 0, 1, 0),
+        BackgroundColor3 = Config.AccentColor,
+        BorderSizePixel = 0,
+        Parent = BackgroundBar
+    })
+    
+    -- Thumb Handle
+    local Thumb = Create("Frame", {
+        Name = "Thumb",
+        Size = UDim2.new(0, 12, 0, 12),
+        Position = UDim2.new((currentValue - min) / (max - min), 0, 0.5, -6),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = Config.TextColor,
+        BorderSizePixel = 0,
+        Parent = SliderFrame
+    })
+    
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 6),
+        Parent = Thumb
+    })
+
+    -- Dragging Logic (FIXED: Explicitly uses GetMouseLocation for Vector2)
+    local IsDraggingSlider = false
+
+    local function updateValue(inputPos)
+        local barWidth = BackgroundBar.AbsoluteSize.X
+        local barX = BackgroundBar.AbsolutePosition.X
+        local relativeX = math.clamp(inputPos.X - barX, 0, barWidth)
+        local percentage = relativeX / barWidth
+        
+        local rawValue = min + (max - min) * percentage
+        
+        -- Apply increment/step
+        if increment > 0 then
+            rawValue = math.floor(rawValue / increment + 0.5) * increment
+        end
+        
+        currentValue = math.clamp(rawValue, min, max)
+        
+        -- Update UI
+        local newScale = (currentValue - min) / (max - min)
+        FillBar.Size = UDim2.new(newScale, 0, 1, 0)
+        Thumb.Position = UDim2.new(newScale, 0, 0.5, -6)
+        ValueLabel.Text = string.format("%.1f", currentValue)
+        
+        pcall(callback, currentValue)
+    end
+
+    local function StartDragSlider(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            IsDraggingSlider = true
+            -- Use InputObject.Position which is a Vector3, but we only need X/Y, so call updateValue with the Vector2 screen position
+            updateValue(UserInputService:GetMouseLocation()) 
+        end
+    end
+    
+    local function DoDragSlider()
+        if IsDraggingSlider then
+            -- Use GetMouseLocation to safely get the Vector2 screen position
+            updateValue(UserInputService:GetMouseLocation()) 
+        end
+    end
+
+    local function EndDragSlider()
+        IsDraggingSlider = false
+    end
+
+    Thumb.InputBegan:Connect(StartDragSlider)
+    BackgroundBar.InputBegan:Connect(StartDragSlider)
+    UserInputService.InputChanged:Connect(DoDragSlider)
+    UserInputService.InputEnded:Connect(EndDragSlider)
+    
+    -- Initial callback
+    pcall(callback, currentValue)
+
+    return ControlFrame
+end
+
+-- 5. Dropdown
+function tabTable:_CreateDropdown(controlName, options, defaultValue, callback)
+    local SectionFrame = self.Controls
+    
+    local ControlFrame = Create("Frame", {
+        Name = controlName:gsub("%s+", "_") .. "Control",
+        Size = UDim2.new(1, 0, 0, Config.ControlHeight),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Parent = SectionFrame
+    })
+    
+    -- Label
+    Create("TextLabel", {
+        Name = "Label",
+        Text = controlName,
+        Size = UDim2.new(0.5, 0, 1, 0),
+        Position = UDim2.new(0, 0, 0, 0),
+        Font = Config.Font,
+        TextSize = 14,
+        TextColor3 = Config.TextColor,
+        BackgroundTransparency = 1,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = ControlFrame
+    })
+    
+    local currentState = defaultValue
+    local isOpen = false
+    
+    -- Dropdown Button
+    local DropdownButton = Create("TextButton", {
+        Name = "DropdownButton",
+        Text = defaultValue,
+        Size = UDim2.new(0.45, 0, 1, 0),
+        Position = UDim2.new(0.55, 0, 0, 0),
+        BackgroundColor3 = Config.PrimaryColor,
+        TextColor3 = Config.TextColor,
+        Font = Config.Font,
+        TextSize = 14,
+        BorderSizePixel = 0,
+        Parent = ControlFrame
+    })
+    
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 5),
+        Parent = DropdownButton
+    })
+    
+    -- Options Container (initially hidden)
+    local OptionsContainer = Create("Frame", {
+        Name = "OptionsContainer",
+        Size = UDim2.new(0.45, 0, 0, 0),
+        Position = UDim2.new(0.55, 0, 1, 5),
+        AnchorPoint = Vector2.new(0, 0),
+        BackgroundColor3 = Config.PrimaryColor,
+        BorderSizePixel = 0,
+        Visible = false,
+        ZIndex = 2,
+        Parent = ControlFrame -- Parented to ControlFrame so it can overlap
+    })
+    
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 5),
+        Parent = OptionsContainer
+    })
+    
+    local OptionsLayout = Create("UIListLayout", {
+        Name = "OptionsLayout",
+        Padding = UDim.new(0, 1),
+        FillDirection = Enum.FillDirection.Vertical,
+        Parent = OptionsContainer,
+        SortOrder = Enum.SortOrder.LayoutOrder
+    })
+    
+    -- Function to handle option selection
+    local function selectOption(option)
+        currentState = option
+        DropdownButton.Text = option
+        OptionsContainer.Visible = false
+        isOpen = false
+        pcall(callback, option)
+    end
+    
+    -- Populate Options
+    for i, option in ipairs(options) do
+        local OptionButton = Create("TextButton", {
+            Name = option:gsub("%s+", "_") .. "Option",
+            Text = option,
+            Size = UDim2.new(1, 0, 0, Config.ControlHeight),
+            BackgroundColor3 = Config.PrimaryColor,
+            TextColor3 = Config.TextColor,
+            Font = Config.Font,
+            TextSize = 14,
+            BorderSizePixel = 0,
+            Parent = OptionsContainer
+        })
+        
+        -- Highlight on hover/selection
+        OptionButton.MouseEnter:Connect(function() OptionButton.BackgroundColor3 = Config.AccentColor end)
+        OptionButton.MouseLeave:Connect(function() OptionButton.BackgroundColor3 = Config.PrimaryColor end)
+        
+        OptionButton.MouseButton1Click:Connect(function()
+            selectOption(option)
+        end)
+    end
+    
+    -- Adjust size of OptionsContainer based on content
+    OptionsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        OptionsContainer.Size = UDim2.new(0.45, 0, 0, OptionsLayout.AbsoluteContentSize.Y)
+    end)
+    OptionsContainer.Size = UDim2.new(0.45, 0, 0, OptionsLayout.AbsoluteContentSize.Y) -- Initial size
+
+    -- Toggle Dropdown
+    local function toggleDropdown()
+        isOpen = not isOpen
+        OptionsContainer.Visible = isOpen
+        if isOpen then
+            -- Bring to front
+            OptionsContainer.ZIndex = 3
+        else
+            OptionsContainer.ZIndex = 2
+        end
+    end
+    
+    DropdownButton.MouseButton1Click:Connect(toggleDropdown)
+    
+    -- Initial callback
+    pcall(callback, currentState)
+    
+    return ControlFrame
+end
+
+-- 6. Textbox
+function tabTable:_CreateTextbox(controlName, placeholder, defaultValue, callback)
+    local SectionFrame = self.Controls
+
+    local ControlFrame = Create("Frame", {
+        Name = controlName:gsub("%s+", "_") .. "Control",
+        Size = UDim2.new(1, 0, 0, Config.ControlHeight),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Parent = SectionFrame
+    })
+
+    -- Label
+    Create("TextLabel", {
+        Name = "Label",
+        Text = controlName,
+        Size = UDim2.new(0.5, 0, 1, 0),
+        Position = UDim2.new(0, 0, 0, 0),
+        Font = Config.Font,
+        TextSize = 14,
+        TextColor3 = Config.TextColor,
+        BackgroundTransparency = 1,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = ControlFrame
+    })
+
+    -- Textbox
+    local TextBox = Create("TextBox", {
+        Name = "TextBox",
+        Size = UDim2.new(0.45, 0, 1, 0),
+        Position = UDim2.new(0.55, 0, 0, 0),
+        BackgroundColor3 = Config.PrimaryColor,
+        TextColor3 = Config.TextColor,
+        Font = Config.Font,
+        TextSize = 14,
+        Text = defaultValue or "",
+        PlaceholderText = placeholder or "Enter value...",
+        PlaceholderColor3 = Config.TextColor:lerp(Config.PrimaryColor, 0.5),
+        ClearTextOnFocus = false,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        BorderSizePixel = 0,
+        Parent = ControlFrame
+    })
+    
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 5),
+        Parent = TextBox
+    })
+
+    -- Change handling
+    local function onTextChange()
+        pcall(callback, TextBox.Text)
+    end
+    
+    TextBox.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            onTextChange()
+        end
+    end)
+
+    -- Initial callback
+    pcall(callback, defaultValue or "")
+
+    return ControlFrame
+end
+
+-- Return the main module table
 return ExoUI
