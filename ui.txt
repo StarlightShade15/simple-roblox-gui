@@ -2,6 +2,7 @@
     ExoUI Library - A single-file, loadstring-compatible UI Framework for Roblox.
     Features:
     - Initialization function: ExoUI:Init(title)
+    - NEW: ExoUI:CreateTab(tabName, isDefault) can be called after Init().
     - Draggable Main Window.
     - Close (X) and Minimize (-) buttons.
     - RightShift keybind to toggle visibility.
@@ -69,7 +70,7 @@ local function ApplyTheme(themeName)
                 if btn:IsA("TextButton") then
                     btn.TextColor3 = theme.ContentText
                     -- Update accent on selected tab
-                    if btn.Name == MainWindow.ActiveTab.Value then
+                    if MainWindow.ActiveTab and btn.Name == MainWindow.ActiveTab.Value then
                         btn.UIStroke.Color = theme.AccentColor
                     else
                         btn.UIStroke.Color = theme.SecondaryBg
@@ -133,7 +134,17 @@ local function CreateThemeOption(parent, themeName)
     end)
 end
 
-local function CreateTab(tabName, isDefault)
+-- New public method for creating tabs
+function ExoUI:CreateTab(tabName, isDefault)
+    if not MainWindow or not MainWindow:FindFirstChild("TabContainer") then
+        error("ExoUI:CreateTab called before Init() or MainWindow not found.")
+        return nil
+    end
+
+    local TabsFrame = MainWindow:FindFirstChild("TabContainer"):FindFirstChild("Tabs")
+    local ContentFrame = MainWindow:FindFirstChild("ContentFrame")
+    local ActiveTab = MainWindow.ActiveTab
+    
     local tabButton = Instance.new("TextButton")
     tabButton.Name = tabName
     tabButton.Text = tabName
@@ -142,7 +153,7 @@ local function CreateTab(tabName, isDefault)
     tabButton.TextColor3 = Themes[CurrentTheme].ContentText
     tabButton.Font = Enum.Font.SourceSansBold
     tabButton.TextSize = 16
-    tabButton.Parent = MainWindow:FindFirstChild("TabContainer"):FindFirstChild("Tabs")
+    tabButton.Parent = TabsFrame
     
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim2.new(0, 4)
@@ -162,8 +173,14 @@ local function CreateTab(tabName, isDefault)
     contentFrame.Name = tabName .. "Content"
     contentFrame.Size = UDim2.new(1, 0, 1, 0)
     contentFrame.BackgroundTransparency = 1
-    contentFrame.Parent = MainWindow:FindFirstChild("ContentFrame")
-    contentFrame.Visible = isDefault
+    contentFrame.Parent = ContentFrame
+    
+    -- Set visibility based on if it's the default tab
+    contentFrame.Visible = isDefault or (not ActiveTab.Value and tabName == "Combat") -- Fallback to Combat if ActiveTab is not set
+
+    if isDefault then
+        ActiveTab.Value = tabName
+    end
     
     -- Example content for the tab
     local label = Instance.new("TextLabel")
@@ -189,10 +206,10 @@ local function CreateTab(tabName, isDefault)
         stroke.Thickness = 2
         
         -- Set active tab and update content
-        MainWindow.ActiveTab.Value = tabName
+        ActiveTab.Value = tabName
         
         -- Hide all content frames
-        for _, frame in MainWindow:FindFirstChild("ContentFrame"):GetChildren() do
+        for _, frame in ContentFrame:GetChildren() do
             if frame:IsA("Frame") then
                 frame.Visible = false
             end
@@ -205,7 +222,7 @@ local function CreateTab(tabName, isDefault)
     -- Ensure stroke color updates on theme change
     tabButton.Changed:Connect(function(property)
         if property == "TextColor3" then
-            if MainWindow.ActiveTab.Value == tabName then
+            if ActiveTab.Value == tabName then
                 stroke.Color = Themes[CurrentTheme].AccentColor
             end
         end
@@ -461,12 +478,12 @@ function ExoUI:Init(title)
     -- Value to track active tab (used for theme application)
     local ActiveTab = Instance.new("StringValue")
     ActiveTab.Name = "ActiveTab"
-    ActiveTab.Value = "Combat" -- Default Tab
+    ActiveTab.Value = "" -- Initialize to empty
     ActiveTab.Parent = MainWindow
 
-    -- Create tab buttons and content
-    CreateTab("Combat", true) -- Default tab
-    CreateTab("Visual", false)
+    -- Create tab buttons and content using the new method
+    self:CreateTab("Combat", true) -- Default tab
+    self:CreateTab("Visual", false)
     
     -- 8. Connect Settings Button
     SettingsButton.MouseButton1Click:Connect(function()
