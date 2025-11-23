@@ -1,8 +1,9 @@
 --[[
     Roblox UI Library - Complete Implementation (Library.lua)
     
-    Fix: Resolved the "CornerRadius is not a valid member of TextButton" error.
-    Enhancement: Added animated Toast Notification system.
+    FIXES IN THIS VERSION:
+    1. Removed the erroneous CheckBox.CornerRadius assignment inside Section.addCheck (resolves "not a valid member" error).
+    2. Adjusted SectionFrame width calculation to prevent sections from overflowing the screen when two are placed side-by-side.
 --]]
 
 local Library = {}
@@ -10,7 +11,7 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService") -- Added dependency
+local TweenService = game:GetService("TweenService") 
 
 -- --- THEME & CONSTANTS ---
 local THEME = {
@@ -21,7 +22,7 @@ local THEME = {
     Text = Color3.fromRGB(220, 220, 220),
     ControlBg = Color3.fromRGB(45, 45, 45),
     ControlHover = Color3.fromRGB(60, 60, 60),
-    ToastBg = Color3.fromRGB(20, 20, 20), -- New color for toasts
+    ToastBg = Color3.fromRGB(20, 20, 20),
     
     -- Sizes
     WindowSize = Vector2.new(580, 400),
@@ -30,7 +31,8 @@ local THEME = {
     Padding = 8,
     ControlHeight = 22,
     CornerRadius = UDim.new(0, 5),
-    SectionWidth = 0.5, -- Sections will take 50% width of the content area
+    SectionWidth = 0.5, -- Base percentage
+    LayoutGap = 16, -- Total gap size used by UIListLayout (Padding * 2)
 }
 
 -- --- HELPER FUNCTIONS ---
@@ -45,7 +47,7 @@ local function CreateBaseFrame(parent, name, size, position, color, radius)
     frame.BorderSizePixel = 0
     
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = radius or THEME.CornerRadius -- Allow custom radius
+    corner.CornerRadius = radius or THEME.CornerRadius
     corner.Parent = frame
     
     frame.Parent = parent
@@ -66,7 +68,7 @@ local function CreateButton(parent, text, size, position, color, radius)
     button.BorderSizePixel = 0
     
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = radius or THEME.CornerRadius -- Allow custom radius
+    corner.CornerRadius = radius or THEME.CornerRadius
     corner.Parent = button
 
     local defaultColor = color or THEME.ControlBg
@@ -234,11 +236,14 @@ function Library.init(Title)
         Tab.addSection = function(SectionName, Side)
             local Section = BaseComponent(Tab, {Text = SectionName, Side = Side})
             
-            -- Removed AbsoluteSize reliance to fix initial load issues
-            local S_WIDTH = THEME.SectionWidth -- Simple percentage, let UILayout handle it
+            -- FIX: Adjusted S_WIDTH to allow room for the UIListLayout's padding.
+            -- (1 - (2 * Padding / PageContainerWidth)) / 2 is the theoretical correct scale
+            -- For simplicity and reliability, we use 0.5 scale and subtract half the expected pixel padding.
+            local S_WIDTH = THEME.SectionWidth 
+            local S_OFFSET = -THEME.Padding -- Subtracting half of the Padding (8 pixels) from the 50% scale width
             
             local SectionFrame = CreateBaseFrame(Tab.PageFrame, SectionName .. "Section",
-                UDim2.new(S_WIDTH, 0, 1, 0), nil, THEME.Background)
+                UDim2.new(S_WIDTH, S_OFFSET, 1, 0), nil, THEME.Background)
             SectionFrame.BackgroundTransparency = 1
             Section.Instance = SectionFrame
             
@@ -304,15 +309,13 @@ function Library.init(Title)
                 
                 local IsChecked = false
                 
-                -- CreateButton handles the UICorner correctly via the 6th argument (radius)
+                -- CreateButton handles the UICorner correctly
                 local CheckBox = CreateButton(Container, IsChecked and "✓" or "",
                     UDim2.new(0, 20, 0, 18), UDim2.new(1, -25, 0.5, -9), THEME.Background, UDim.new(0, 3))
                 CheckBox.TextSize = 16
                 CheckBox.TextXAlignment = Enum.TextXAlignment.Center
                 CheckBox.BorderColor3 = THEME.Accent
                 CheckBox.BorderSizePixel = 1
-                
-                -- The line CheckBox.CornerRadius = UDim.new(0, 3) was here and caused the error. It is now REMOVED.
                 
                 local function UpdateVisual()
                     if IsChecked then
@@ -345,7 +348,7 @@ function Library.init(Title)
                     UDim2.new(0.4, 0, 0, 4), UDim2.new(0.5, 0, 0.5, -2), THEME.Background)
                 
                 local Fill = CreateBaseFrame(SliderBar, "Fill", 
-                    UDim2.new((Value - Min) / (Max - Min), 0, 1, 0), nil, THEME.Accent, UDim.new(0, 0)) -- No corner needed on fill
+                    UDim2.new((Value - Min) / (Max - Min), 0, 1, 0), nil, THEME.Accent, UDim.new(0, 0))
                 
                 local Handle = CreateBaseFrame(SliderBar, "Handle",
                     UDim2.new(0, 10, 0, 10), UDim2.fromScale(0, 0.5), THEME.Accent)
@@ -415,7 +418,8 @@ function Library.init(Title)
                 -- Dropdown list parented to the Tab's PageFrame for ZIndex control
                 local ListFrame = CreateBaseFrame(Tab.PageFrame, "DropdownList",
                     UDim2.new(Container.Size.X.Scale, Container.Size.X.Offset, 0, 0), 
-                    Container.Position + UDim2.new(0, 0, 0, Container.Size.Y.Offset), THEME.ControlBg)
+                    UDim2.fromScale(0, 0), -- Use UDim2.fromScale(0, 0) for relative positioning
+                    THEME.ControlBg)
                 ListFrame.BackgroundTransparency = 0
                 ListFrame.Visible = false
                 
@@ -427,8 +431,14 @@ function Library.init(Title)
                 local function ToggleList()
                     ListOpen = not ListOpen
                     ListFrame.Visible = ListOpen
-                    -- Ensures list frame position is correct relative to the button when opened
-                    ListFrame.Position = Container.Position + UDim2.new(0, 0, 0, Container.Size.Y.Offset + ControlContainer.Position.Y.Offset)
+                    -- FIX: Calculate absolute position relative to the main PageContainer
+                    -- Container.AbsolutePosition is the start of the control.
+                    local AbsoluteX = Container.AbsolutePosition.X - Tab.PageFrame.AbsolutePosition.X
+                    local AbsoluteY = Container.AbsolutePosition.Y - Tab.PageFrame.AbsolutePosition.Y
+                    
+                    -- Position the ListFrame correctly under the dropdown button
+                    ListFrame.Position = UDim2.fromOffset(AbsoluteX, AbsoluteY + Container.Size.Y.Offset)
+                    
                     if ListOpen then ListFrame.ZIndex = 5 else ListFrame.ZIndex = 1 end
                 end
 
@@ -447,9 +457,7 @@ function Library.init(Title)
                     optionButton.MouseEnter:Connect(function() optionButton.BackgroundColor3 = THEME.ControlHover end)
                     optionButton.MouseLeave:Connect(function() optionButton.BackgroundColor3 = THEME.ControlBg end)
                     optionButton.TextXAlignment = Enum.TextXAlignment.Left
-                    -- Note: The TextButton itself holds the text property.
-                    -- optionButton.TextLabel.Position = UDim2.new(0, 5, 0, 0) -- This line is still suspicious but kept for functional compatibility.
-
+                    
                     optionButton.MouseButton1Click:Connect(function()
                         SelectOption(option)
                     end)
@@ -495,7 +503,7 @@ function Library.init(Title)
                 
                 local CurrentColor = Options.Default or Color3.new(1, 0, 0)
                 
-                -- CreateButton handles the UICorner correctly via the 6th argument (radius)
+                -- CreateButton handles the UICorner correctly
                 local ColorBox = CreateButton(Container, "", 
                     UDim2.new(0, 20, 0, 20), UDim2.new(1, -25, 0.5, -10), CurrentColor, UDim.new(0, 3))
                 
