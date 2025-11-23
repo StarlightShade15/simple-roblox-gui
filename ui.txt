@@ -2,8 +2,8 @@
     Roblox UI Library - Complete Implementation (Library.lua)
     
     FINAL FIXES:
-    1. Fixed "MouseButton1Click is not a valid member of Frame" on InputBlocker by using the InputBegan event.
-    2. Verified no direct assignment of 'CornerRadius' to 'TextButton' remains in the code.
+    1. CRITICAL: Fixed "Invalid argument #1 (Vector2 expected, got Vector3)" during dragging by ensuring only Vector2 coordinates are used in mouse position calculations.
+    2. Audited InputBlocker and Checkbox components for persistent errors.
 --]]
 
 local Library = {}
@@ -122,7 +122,7 @@ function Library.init(Title)
     InputBlocker.Parent = ScreenGui
     Window.InputBlocker = InputBlocker
     
-    -- FIX 1: Use InputBegan to capture clicks on the InputBlocker frame
+    -- FIX: Use InputBegan to capture clicks on the InputBlocker frame
     InputBlocker.InputBegan:Connect(function(input)
         if Window.CloseDropdown and InputBlocker.Visible then
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -183,14 +183,15 @@ function Library.init(Title)
     PageContainer.BackgroundTransparency = 1
     Window.PageContainer = PageContainer
     
-    -- Dragging Logic setup... (omitted for brevity)
+    -- Dragging Logic
     local Dragging = false
     local DragOffset = Vector2.zero
     
     Header.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             Dragging = true
-            DragOffset = input.Position - WindowFrame.AbsolutePosition
+            -- Input.Position is a Vector3, DragOffset must be Vector2
+            DragOffset = Vector2.new(input.Position.X, input.Position.Y) - WindowFrame.AbsolutePosition
             Header.LayoutOrder = 1 
         end
     end)
@@ -203,9 +204,11 @@ function Library.init(Title)
     
     RunService.RenderStepped:Connect(function()
         if Dragging then
+            local mouse = Players.LocalPlayer:GetMouse()
+            -- FIX: GetMouse() properties (X, Y) are numbers, ensuring Vector2 usage
             WindowFrame.Position = UDim2.fromOffset(
-                Players.LocalPlayer:GetMouse().X - DragOffset.X,
-                Players.LocalPlayer:GetMouse().Y - DragOffset.Y
+                mouse.X - DragOffset.X,
+                mouse.Y - DragOffset.Y
             )
         end
     end)
@@ -220,7 +223,7 @@ function Library.init(Title)
         TabButton.TextXAlignment = Enum.TextXAlignment.Center
         Tab.Instance = TabButton
         
-        -- Page Scroll Frame (NEW: Enables vertical scrolling)
+        -- Page Scroll Frame 
         local PageScroll = Instance.new("ScrollingFrame")
         PageScroll.Name = Name .. "PageScroll"
         PageScroll.Size = UDim2.new(1, 0, 1, 0)
@@ -355,6 +358,8 @@ function Library.init(Title)
                 local Control, Container = CreateControlContainer("Check", Options)
                 local IsChecked = Options.Default or false
                 
+                -- CRITICAL: This is the button that was causing the persistent CornerRadius error if manually assigned. 
+                -- We rely solely on CreateButton's internal UICorner creation.
                 local CheckBox = CreateButton(Container, IsChecked and "✓" or "",
                     UDim2.new(0, 20, 0, 18), UDim2.new(1, -25, 0.5, -9), THEME.Background, UDim.new(0, 3))
                 CheckBox.TextSize = 16
@@ -448,7 +453,6 @@ function Library.init(Title)
             end
             
             -- Dropdown
-            -- Global reference for closing any open dropdown
             local currentDropdownList = nil
             
             Window.CloseDropdown = function()
