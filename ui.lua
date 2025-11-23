@@ -1,8 +1,8 @@
 --[[
-    UI Library ModuleScript - FINAL & DEFINITIVE VERSION with Dropdown Fix
+    UI Library ModuleScript - FINAL & DEFINITIVE VERSION with Dropdown Toggle Fix
     
-    This version includes definitive fixes for ALL errors reported and the final fix
-    for the dropdown not closing after selection.
+    This version includes the fix for the dropdown not closing when the main button
+    is clicked a second time (making it a proper toggle control).
 --]]
 
 local Library = {}
@@ -120,6 +120,7 @@ function Library.init(Title)
     Window.InputBlocker = InputBlocker
     
     -- FIX: Use InputBegan instead of MouseButton1Click for Frame events
+    -- This handles clicks *outside* the dropdown area
     InputBlocker.InputBegan:Connect(function(input)
         if Window.CloseDropdown and InputBlocker.Visible then
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -487,22 +488,28 @@ function Library.init(Title)
                 ListLayout.Parent = ListFrame
                 
                 local function OpenList()
-                    -- Close any previously open dropdown
-                    Window.CloseDropdown()
-                    
-                    currentDropdownList = ListFrame
-                    Window.InputBlocker.Visible = true
-
                     -- Calculate correct absolute position and size
                     local absPos = DropdownButton.AbsolutePosition
                     local absSize = DropdownButton.AbsoluteSize
                     
-                    -- Set position: directly below the button
-                    ListFrame.Position = UDim2.fromOffset(absPos.X, absPos.Y + absSize.Y)
-                    
-                    -- Set size: width matches the button's width, height matches list items
-                    ListFrame.Size = UDim2.new(0, absSize.X, 0, #Options.List * 20)
-                    ListFrame.Visible = true
+                    -- Only open if the list is currently closed. Otherwise, close it (the toggle)
+                    if not ListFrame.Visible then
+                        -- Close any *other* previously open dropdown before opening this one
+                        Window.CloseDropdown()
+                        
+                        currentDropdownList = ListFrame
+                        Window.InputBlocker.Visible = true
+
+                        -- Set position: directly below the button
+                        ListFrame.Position = UDim2.fromOffset(absPos.X, absPos.Y + absSize.Y)
+                        
+                        -- Set size: width matches the button's width, height matches list items
+                        ListFrame.Size = UDim2.new(0, absSize.X, 0, #Options.List * 20)
+                        ListFrame.Visible = true
+                    else
+                        -- FIX: If the button is clicked and the list is already open, close it.
+                        Window.CloseDropdown()
+                    end
                 end
 
                 DropdownButton.MouseButton1Click:Connect(OpenList)
@@ -510,7 +517,7 @@ function Library.init(Title)
                 local function SelectOption(option)
                     CurrentSelection = option
                     DropdownButton.Text = option
-                    -- FIX: Explicitly call the closure function here.
+                    -- This reliably closes the list when an option is selected.
                     Window.CloseDropdown() 
                     if Options.Callback then Options.Callback(option) end
                 end
@@ -523,6 +530,7 @@ function Library.init(Title)
                     optionButton.TextXAlignment = Enum.TextXAlignment.Left
                     optionButton.ZIndex = 5
                     
+                    -- Option click handler: selects option and closes dropdown
                     optionButton.MouseButton1Click:Connect(function()
                         SelectOption(option)
                     end)
