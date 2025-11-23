@@ -11,7 +11,15 @@
 --]]
 local Library = {}
 local Players = game:GetService("Players")
-local LocalPlayer = Players:WaitForChild("LocalPlayer")
+
+-- Modified section starts here
+local LocalPlayer = nil
+repeat
+    LocalPlayer = Players.LocalPlayer
+    -- Use a small task.wait() to yield control and prevent high CPU usage
+    task.wait(0.1) 
+until LocalPlayer ~= nil
+
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService") 
