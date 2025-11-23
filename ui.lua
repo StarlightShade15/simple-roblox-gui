@@ -6,6 +6,7 @@
     2. Dropdown remaining open when switching tabs (added close logic to Tab:Select).
     3. Removed the problematic full-screen InputBlocker.
     4. FIX: Moved Window.CloseDropdown to be defined early in init() to prevent 'nil' error during first tab selection.
+    5. **NEW FIX:** Wrapped the initial Tab selection in `task.defer` to resolve the 'attempt to call a nil value' error when initializing the first tab.
 --]]
 
 local Library = {}
@@ -672,7 +673,11 @@ function Library.init(Title)
         
         -- Select the first tab automatically
         if #Window.Children == 1 then
-            Window.Children[1]:Select()
+            -- FIX: Use task.defer to ensure the Tab:Select function runs AFTER 
+            -- the current Library.init thread has finished and Window.CloseDropdown is fully defined.
+            task.defer(function()
+                Window.Children[1]:Select()
+            end)
         end
         
         return Tab
