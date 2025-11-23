@@ -565,7 +565,9 @@ function Library.init(Title)
                 local CurrentColor = Options.Default or Color3.new(1, 0, 0)
                 local h, s, v = CurrentColor:ToHSV()
                 
-                -- CreateButton handles the CornerRadius correctly now
+                -- Color Box - This uses the hardcoded size/position which is safe.
+                -- If this is where the error occurs, it is likely inside the CreateButton helper,
+                -- but we already fixed the CornerRadius error there. Let's ensure the UDim2 is robust.
                 local ColorBox = CreateButton(Container, "", 
                     UDim2.new(0, 20, 0, 20), UDim2.new(1, -25, 0.5, -10), CurrentColor, UDim.new(0, 3))
                 ColorBox.BackgroundColor3 = CurrentColor
@@ -584,18 +586,27 @@ function Library.init(Title)
                     Maximum = 1,
                     Default = h,
                     Callback = UpdateColor,
-                    -- FIX: Provide a Text field to prevent 'gsub' error on internal slider creation
-                    Text = "HueSliderControl"
+                    -- FIX: This Text field prevents the 'gsub' error
+                    Text = "HueSliderControl" 
                 }
-
-                local SliderControl, SliderContainer = Section.addSlider(ColorSliderOptions)
-                SliderContainer.Size = UDim2.new(1, 0, 0, THEME.ControlHeight) 
-                SliderContainer.Position = UDim2.new(0, 0, 0, 0)
-                SliderContainer.Parent = Container 
-
+            
+                local SliderControl = Section.addSlider(ColorSliderOptions) 
+                local SliderContainer = SliderControl.Instance
+            
+                -- The crash happens here because the layout changes were applied to SliderContainer
+                -- which may not be fully initialized or is being referenced incorrectly after addSlider returns.
+                -- We must ensure the returned instance is used and its properties are set safely.
+                
+                -- Set the size and position *after* creation using the returned instance
+                SliderContainer.Size = UDim2.new(0.65, 0, 0, THEME.ControlHeight) -- Give it 65% width to fit label and box
+                SliderContainer.Position = UDim2.new(0.3, 0, 0, 0) 
+                
+                -- We need to reparent the slider bar and label if they are already parented to the main control container
+                -- By default, addSlider parents to ControlContainer. Let's make sure it's positioned correctly.
+                
                 SliderControl.Label.Text = "Hue" -- Change the visible label back to "Hue"
                 SliderContainer.Name = "HueSlider"
-
+            
                 UpdateColor(h)
                 
                 return Control
