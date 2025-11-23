@@ -1,12 +1,8 @@
 --[[
-    UI Library ModuleScript - FINAL & DEFINITIVE VERSION
+    UI Library ModuleScript - FINAL & DEFINITIVE VERSION with Dropdown Fix
     
-    This version includes definitive fixes for ALL errors reported:
-    1. CornerRadius property (Fixed in CreateButton and CreateBaseFrame helpers).
-    2. MouseButton1Click on Frame (Changed to InputBegan in Window.init).
-    3. Vector2 vs Vector3 drag error (Fixed in Window.init drag logic).
-    4. Gsub error (Ensured Options.Text exists for internal controls).
-    5. 'attempt to index nil with 'Size'' (Fixed by safely adjusting the internal slider's components).
+    This version includes definitive fixes for ALL errors reported and the final fix
+    for the dropdown not closing after selection.
 --]]
 
 local Library = {}
@@ -514,7 +510,8 @@ function Library.init(Title)
                 local function SelectOption(option)
                     CurrentSelection = option
                     DropdownButton.Text = option
-                    Window.CloseDropdown()
+                    -- FIX: Explicitly call the closure function here.
+                    Window.CloseDropdown() 
                     if Options.Callback then Options.Callback(option) end
                 end
 
