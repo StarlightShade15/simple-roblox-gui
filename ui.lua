@@ -5,6 +5,7 @@
     1. Dropdown options remaining visible (closure fix and failsafe positioning).
     2. Dropdown remaining open when switching tabs (added close logic to Tab:Select).
     3. Removed the problematic full-screen InputBlocker.
+    4. FIX: Moved Window.CloseDropdown to be defined early in init() to prevent 'nil' error during first tab selection.
 --]]
 
 local Library = {}
@@ -163,6 +164,23 @@ function Library.init(Title)
     PageContainer.BackgroundTransparency = 1
     Window.PageContainer = PageContainer
     
+    -- --- GLOBAL UTILITIES (Defined early to prevent nil errors) ---
+    local currentDropdownList = nil -- Global reference to the currently open list frame
+    
+    -- Global function to close any currently open dropdown
+    Window.CloseDropdown = function()
+        if currentDropdownList then
+            -- Primary closure mechanism
+            currentDropdownList.Visible = false 
+            
+            -- Failsafe: Move the frame far off-screen to guarantee it's not clickable
+            currentDropdownList.Position = UDim2.new(0, -9999, 0, -9999)
+
+            currentDropdownList = nil
+        end
+    end
+    -- End of Global Utilities
+
     -- Dragging Logic
     local Dragging = false
     local DragOffset = Vector2.zero
@@ -232,7 +250,7 @@ function Library.init(Title)
 
         -- Selection Logic setup... 
         function Tab:Select()
-            -- FIX: Close any active dropdown when switching tabs
+            -- FIX: Close any active dropdown when switching tabs (Now guaranteed to exist)
             Window.CloseDropdown() 
             
             for _, childTab in ipairs(Window.Children) do
@@ -442,20 +460,7 @@ function Library.init(Title)
             end
             
             -- Dropdown
-            local currentDropdownList = nil -- Global reference to the currently open list frame
-            
-            -- Global function to close any currently open dropdown
-            Window.CloseDropdown = function()
-                if currentDropdownList then
-                    -- Primary closure mechanism
-                    currentDropdownList.Visible = false 
-                    
-                    -- Failsafe: Move the frame far off-screen to guarantee it's not clickable
-                    currentDropdownList.Position = UDim2.new(0, -9999, 0, -9999)
-
-                    currentDropdownList = nil
-                end
-            end
+            -- NOTE: currentDropdownList and Window.CloseDropdown are defined globally in Library.init
             
             function Section.addDropdown(Options)
                 local Control, Container = CreateControlContainer("Dropdown", Options)
