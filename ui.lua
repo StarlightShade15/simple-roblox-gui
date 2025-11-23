@@ -5,9 +5,10 @@
     1. Full RGB/A Color Picker using four separate sliders (R, G, B, A).
     2. Dynamic Section Sizing: Sections now automatically size based on the number of controls they contain.
     3. Two-Column Overflow Logic: Sections are placed in the left column first, but if adding a new section would exceed the current page height, it's moved to the right column (`LayoutOrder = 1`).
-    4. **FIXES:** Resolved the nil value error during initial tab selection using task.defer.
+    4. FIXES: Resolved the nil value error during initial tab selection using task.defer.
+    
+    This is the UI Library core (formerly ui.lua).
 --]]
-
 local Library = {}
 local Players = game:GetService("Players")
 local LocalPlayer = Players:WaitForChild("LocalPlayer")
@@ -37,7 +38,6 @@ local THEME = {
     -- Layout
     SectionColumnCount = 2,
     SectionContentPadding = 8,
-    -- SectionHeight is now DYNAMIC, but we keep the control flow constants
     ControlPadding = 2, -- Padding between controls (used in list layout)
     SectionHeaderHeight = 15, -- Height of the section title label
 }
@@ -176,7 +176,7 @@ function Library.init(Title)
     end
     -- End of Global Utilities
 
-    -- Dragging Logic (Omitted for brevity, assume it's correctly placed here)
+    -- Dragging Logic
     local Dragging = false
     local DragOffset = Vector2.zero
     
@@ -212,8 +212,8 @@ function Library.init(Title)
         -- Tracking for dynamic two-column layout
         -- Key: 0 (Left Column), 1 (Right Column)
         Tab.ColumnHeights = {
-            [0] = 0, -- Left column accumulated control height
-            [1] = 0  -- Right column accumulated control height
+            [0] = 0, -- Left column height
+            [1] = 0  -- Right column height
         }
         
         -- Maximum height for a single column (ContentFrame Height - Padding)
@@ -284,21 +284,19 @@ function Library.init(Title)
         Tab.addSection = function(SectionName, Side)
             local Section = BaseComponent(Tab, {Text = SectionName, Side = Side})
             
-            -- CONTROL HEIGHT CALCULATION:
+            -- CONTROL HEIGHT CALCULATION: Title + (ControlCount * ControlHeight) + (ControlCount - 1) * ControlPadding + 2*Padding
             
-            -- Function to calculate section height based on control count
+            -- Function to calculate section height based on control count (pre-insertion)
             local function calculateSectionHeight(controlCount)
-                -- 1. Section Title Height (15px)
-                -- 2. Inner Top/Bottom Padding (2 * 8px)
-                -- 3. Total Control Height (Count * 22px)
-                -- 4. Total Inner Padding ( (Count - 1) * 2px)
-                
-                local controlPaddingCount = math.max(0, controlCount - 1)
+                -- 15: Title height
+                -- 2 * THEME.SectionContentPadding: Top/Bottom Inner Padding
+                -- controlCount * THEME.ControlHeight: total control box height
+                -- (controlCount > 0 and controlCount - 1 or 0) * THEME.ControlPadding: total padding between controls
                 
                 local totalContentHeight = 
                     THEME.SectionHeaderHeight + 
                     (controlCount * THEME.ControlHeight) + 
-                    (controlPaddingCount * THEME.ControlPadding)
+                    ((controlCount > 0 and controlCount - 1 or 0) * THEME.ControlPadding)
 
                 return totalContentHeight + (2 * THEME.SectionContentPadding)
             end
@@ -310,28 +308,31 @@ function Library.init(Title)
             local columnKey = 0 -- Default to Left Column
             local columnLayoutOrder = 0 -- Default to Left Column (first in Grid)
             
-            local sectionHeaderAndPadding = THEME.SectionHeaderHeight + 2 * THEME.SectionContentPadding
-            local assumedMinHeight = sectionHeaderAndPadding + THEME.ControlHeight + THEME.Padding -- Estimate for 1 control
-            
-            -- Check for automatic overflow placement
-            local newLeftHeight = Tab.ColumnHeights[0] + assumedMinHeight
-            local newRightHeight = Tab.ColumnHeights[1] + assumedMinHeight
-            
-            -- Check if Left column is already full (90% threshold) and Right is emptier
-            if newLeftHeight > Tab.MaxColumnHeight * 0.9 and Tab.ColumnHeights[1] < Tab.ColumnHeights[0] then
+            -- If Side is explicitly set, use it.
+            if Side == "Right" then
                 columnKey = 1
                 columnLayoutOrder = 1
+            else
+                -- Check for automatic overflow placement
+                local assumedSectionHeight = calculateSectionHeight(1) -- Start with height of 1 control
+                local newLeftHeight = Tab.ColumnHeights[0] + assumedSectionHeight
+                
+                -- Check if Left column is already full and Right is emptier
+                if newLeftHeight > Tab.MaxColumnHeight * 0.9 and Tab.ColumnHeights[1] < Tab.ColumnHeights[0] then
+                    columnKey = 1
+                    columnLayoutOrder = 1
+                end
             end
             
-            -- Section Container (The UIGridLayout cell item)
+            -- Section Container
             local SectionContainer = CreateBaseFrame(PageFrame, SectionName .. "SectionContainer",
                 UDim2.new(1, 0, 0, 0), UDim2.fromScale(0, 0), THEME.Background)
             SectionContainer.BackgroundTransparency = 1
             SectionContainer.LayoutOrder = columnLayoutOrder -- Set to 0 (left) or 1 (right)
             
-            -- The actual Section Frame (Background Box) - Initial height is dummy, updated later
+            -- The actual Section Frame (Background Box)
             local SectionFrame = CreateBaseFrame(SectionContainer, SectionName .. "Frame",
-                UDim2.new(1, 0, 0, 1), nil, THEME.ControlBg)
+                UDim2.new(1, 0, 0, 100), nil, THEME.ControlBg) -- Initial height is dummy
             Section.Instance = SectionFrame
             
             -- Inner padding frame for controls
@@ -390,25 +391,16 @@ function Library.init(Title)
                 
                 Control.Label = TextLabel
                 
-                -- Dynamic Height Update Logic (FIXED)
+                -- Update height counter
                 controlCount = controlCount + 1
-                local newSectionHeight = calculateSectionHeight(controlCount)
+                local newHeight = calculateSectionHeight(controlCount)
                 
-                -- 1. Adjust SectionFrame size (The visible background)
-                SectionFrame.Size = UDim2.new(1, 0, 0, newSectionHeight)
-                
-                -- 2. Adjust SectionContainer size (The UIGridLayout item needs to be sized)
-                SectionContainer.Size = UDim2.new(1, 0, 0, newSectionHeight)
-                
-                -- 3. Update Tab height tracking (for overflow calculation)
-                -- We track the cumulative height of controls and padding in the column
+                -- Adjust SectionFrame size and update Tab height tracking
+                SectionFrame.Size = UDim2.new(1, 0, 0, newHeight)
                 Tab.ColumnHeights[columnKey] = Tab.ColumnHeights[columnKey] + THEME.ControlHeight + THEME.ControlPadding
                 
-                -- 4. Update UIGridLayout CellSize to match the tallest column's assumed height
-                local maxColHeightControls = math.max(Tab.ColumnHeights[0], Tab.ColumnHeights[1])
-                local headerAndPadding = THEME.SectionHeaderHeight + THEME.SectionContentPadding * 2 + THEME.Padding
-                local maxColHeight = maxColHeightControls + headerAndPadding
-                
+                -- Update UIGridLayout CellSize to fit the longest column so far
+                local maxColHeight = math.max(Tab.ColumnHeights[0], Tab.ColumnHeights[1]) + (THEME.SectionHeaderHeight + THEME.SectionContentPadding * 2) + THEME.Padding
                 SectionGridLayout.CellSize = UDim2.new(CellScale, -THEME.Padding, 0, maxColHeight)
 
                 return Control, Container
@@ -418,7 +410,6 @@ function Library.init(Title)
             
             -- Checkbox 
             function Section.addCheck(Options)
-                -- controlCount is incremented inside CreateControlContainer
                 local Control, Container = CreateControlContainer("Check", Options)
                 local IsChecked = Options.Default or false
                 
@@ -445,9 +436,8 @@ function Library.init(Title)
                 return Control
             end
 
-            -- Slider (Unchanged logic)
+            -- Slider
             function Section.addSlider(Options)
-                -- controlCount is incremented inside CreateControlContainer
                 local Control, Container = CreateControlContainer("Slider", Options)
                 
                 local Min = Options.Minimum or 0
@@ -519,9 +509,8 @@ function Library.init(Title)
                 return Control
             end
             
-            -- Dropdown (Omitted for brevity, assumed correctly placed here)
+            -- Dropdown
             function Section.addDropdown(Options)
-                -- controlCount is incremented inside CreateControlContainer
                 local Control, Container = CreateControlContainer("Dropdown", Options)
                 
                 local CurrentSelection = Options.List and Options.List[1] or "None"
@@ -581,9 +570,8 @@ function Library.init(Title)
                 return Control
             end
             
-            -- Text Input (Omitted for brevity, assumed correctly placed here)
+            -- Text Input
             function Section.addInput(Options)
-                -- controlCount is incremented inside CreateControlContainer
                 local Control, Container = CreateControlContainer("Input", Options)
                 
                 local TextBox = Instance.new("TextBox")
@@ -612,10 +600,8 @@ function Library.init(Title)
                 return Control
             end
 
-            -- Full RGB/A Color Picker (NEW IMPLEMENTATION)
+            -- Full RGB/A Color Picker
             function Section.addColorPicker(Options)
-                -- NOTE: This function calls Section.addSlider four times, which correctly
-                -- increments the controlCount and updates the section height five times (once for the preview, four for the sliders).
                 
                 local initialColor = Options.Default or Color3.new(1, 0, 0)
                 local initialAlpha = Options.DefaultAlpha or 1.0
@@ -624,11 +610,11 @@ function Library.init(Title)
                     R = initialColor.R * 255,
                     G = initialColor.G * 255,
                     B = initialColor.B * 255,
-                    A = initialAlpha * 100 -- Alpha stored as percentage (0-100)
+                    A = initialAlpha * 100
                 }
                 
-                local ColorBox = nil -- Forward declaration
-
+                local rBar, gBar, bBar
+                
                 -- This function handles all UI updates and callback calls
                 local function UpdateColorAndUI(component, value)
                     colorState[component] = value
@@ -640,15 +626,15 @@ function Library.init(Title)
 
                     local finalColor = Color3.new(newR, newG, newB)
                     
-                    if ColorBox then
-                        ColorBox.BackgroundColor3 = finalColor
-                    end
+                    -- Update the preview box
+                    ColorBox.BackgroundColor3 = finalColor
                     
-                    -- Update slider track colors for visual feedback
-                    rBar.BackgroundColor3 = Color3.new(newR, 0, 0)
-                    gBar.BackgroundColor3 = Color3.new(0, newG, 0)
-                    bBar.BackgroundColor3 = Color3.new(0, 0, newB)
-                    aBar.BackgroundColor3 = Color3.new(newR, newG, newB) -- Use the mixed color for Alpha bar
+                    -- Update the background color for R, G, B sliders (must exist before this call)
+                    if rBar and gBar and bBar then
+                        rBar.BackgroundColor3 = Color3.new(finalColor.R, 0, 0)
+                        gBar.BackgroundColor3 = Color3.new(0, finalColor.G, 0)
+                        bBar.BackgroundColor3 = Color3.new(0, 0, finalColor.B)
+                    end
 
                     if Options.Callback then Options.Callback(finalColor, newA) end
                 end
@@ -658,7 +644,7 @@ function Library.init(Title)
                 Container.BackgroundTransparency = 1 -- Hide the container's background
                 Control.Label.Text = Options.Text or "Color"
                 
-                ColorBox = CreateBaseFrame(Container, "ColorPreview", 
+                local ColorBox = CreateBaseFrame(Container, "ColorPreview", 
                     UDim2.new(0, 20, 0, 20), UDim2.new(1, -25, 0.5, -10), initialColor, UDim.new(0, 3))
                 ColorBox.BackgroundColor3 = initialColor
                 
@@ -667,8 +653,8 @@ function Library.init(Title)
                     Text = "R", Minimum = 0, Maximum = 255, Default = colorState.R, Postfix = "",
                     Callback = function(val) UpdateColorAndUI("R", val) end
                 })
-                local rBar = RControl.SliderBar
-                RControl.SliderBar.BackgroundTransparency = 0 -- Keep it visible
+                rBar = RControl.SliderBar
+                RControl.SliderBar.BackgroundTransparency = 0.5
                 RControl.ValueLabel.TextColor3 = Color3.new(1, 0, 0)
                 
                 -- 3. Green Slider (G)
@@ -676,8 +662,8 @@ function Library.init(Title)
                     Text = "G", Minimum = 0, Maximum = 255, Default = colorState.G, Postfix = "",
                     Callback = function(val) UpdateColorAndUI("G", val) end
                 })
-                local gBar = GControl.SliderBar
-                GControl.SliderBar.BackgroundTransparency = 0
+                gBar = GControl.SliderBar
+                GControl.SliderBar.BackgroundTransparency = 0.5
                 GControl.ValueLabel.TextColor3 = Color3.new(0, 1, 0)
 
                 -- 4. Blue Slider (B)
@@ -685,8 +671,8 @@ function Library.init(Title)
                     Text = "B", Minimum = 0, Maximum = 255, Default = colorState.B, Postfix = "",
                     Callback = function(val) UpdateColorAndUI("B", val) end
                 })
-                local bBar = BControl.SliderBar
-                BControl.SliderBar.BackgroundTransparency = 0
+                bBar = BControl.SliderBar
+                BControl.SliderBar.BackgroundTransparency = 0.5
                 BControl.ValueLabel.TextColor3 = Color3.new(0, 0, 1)
 
                 -- 5. Alpha Slider (A)
@@ -694,9 +680,8 @@ function Library.init(Title)
                     Text = "A", Minimum = 0, Maximum = 100, Default = colorState.A, Postfix = "%",
                     Callback = function(val) UpdateColorAndUI("A", val) end
                 })
-                local aBar = AControl.SliderBar
                 AControl.ValueLabel.TextColor3 = THEME.Text
-                AControl.SliderBar.BackgroundTransparency = 0
+                AControl.SliderBar.BackgroundColor3 = THEME.Background
                 
                 -- Initial color setting to ensure slider backgrounds are set correctly
                 UpdateColorAndUI("R", colorState.R)
@@ -706,7 +691,6 @@ function Library.init(Title)
 
             -- Button 
             function Section.addButton(Options)
-                -- controlCount is incremented inside CreateControlContainer
                 local Control, Container = CreateControlContainer("Button", Options)
                 Container.BackgroundTransparency = 1
                 
@@ -715,27 +699,112 @@ function Library.init(Title)
                 
                 Button.MouseButton1Click:Connect(function()
                     if Options.Callback then Options.Callback() end
+                    Library:Toast(Options.Text .. " executed.", 2)
                 end)
+
+                return Control
+            end
+
+            -- Label 
+            function Section.addLabel(Options)
+                local Control, Container = CreateControlContainer("Label", Options)
+                Container.BackgroundTransparency = 1
                 
+                local Label = Instance.new("TextLabel")
+                Label.Text = Options.Text
+                Label.Size = UDim2.new(1, 0, 1, 0)
+                Label.Position = UDim2.new(0, 0, 0, 0)
+                Label.TextColor3 = Options.Color or THEME.Text
+                Label.BackgroundTransparency = 1
+                Label.Font = Enum.Font.SourceSans
+                Label.TextSize = 13
+                Label.Parent = Container
+
+                Control.Label.TextXAlignment = Enum.TextXAlignment.Center
+                Control.Label.Size = UDim2.new(1, 0, 1, 0)
+                Control.Label.Position = UDim2.fromScale(0, 0)
+
                 return Control
             end
             
-            return Section
+            return Tab:AddChild(Section)
         end
         
-        -- Default: Select the first tab created.
-        if #Window.Children == 0 then
+        Window:AddChild(Tab)
+        
+        -- Select the first tab automatically (Safe Initialization)
+        if #Window.Children == 1 then
             task.defer(function()
-                if Window.Children and Window.Children[1] then
-                    Window.Children[1]:Select()
-                end
+                Window.Children[1]:Select()
             end)
         end
         
         return Tab
     end
-    
+
+    -- --- 3. TOAST NOTIFICATION SYSTEM ---
+    local ToastQueue = {} 
+    local ToastTweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local ToastVisible = false
+
+    function Library:Toast(Message, Duration)
+        table.insert(ToastQueue, {Message = Message, Duration = Duration or 3}) 
+        
+        if ToastVisible then return end
+        
+        local function ShowNextToast()
+            if #ToastQueue == 0 then
+                ToastVisible = false
+                return
+            end
+            
+            ToastVisible = true
+            local ToastData = table.remove(ToastQueue, 1)
+            
+            local ToastFrame = CreateBaseFrame(
+                PlayerGui, "Toast", 
+                UDim2.new(0, 300, 0, 50), 
+                UDim2.new(0.5, -150, 1, 60), 
+                THEME.ToastBg, UDim.new(0, 8)
+            )
+            ToastFrame.ClipsDescendants = true
+            ToastFrame.BackgroundTransparency = 0.2
+            ToastFrame.BorderSizePixel = 1
+            ToastFrame.BorderColor3 = THEME.Accent
+            ToastFrame.ZIndex = 6 
+
+            
+            local ToastLabel = Instance.new("TextLabel")
+            ToastLabel.Text = ToastData.Message
+            ToastLabel.Size = UDim2.new(1, -20, 1, -20)
+            ToastLabel.Position = UDim2.new(0, 10, 0, 10)
+            ToastLabel.TextColor3 = THEME.Text
+            ToastLabel.BackgroundTransparency = 1
+            ToastLabel.TextSize = 14
+            ToastLabel.Font = Enum.Font.SourceSans
+            ToastLabel.Parent = ToastFrame
+            
+            local StartPos = UDim2.new(0.5, -150, 1, 60)
+            local EndPos = UDim2.new(0.5, -150, 1, -60) 
+            
+            local TweenIn = TweenService:Create(ToastFrame, ToastTweenInfo, {Position = EndPos})
+            TweenIn:Play()
+            TweenIn.Completed:Wait()
+            
+            task.wait(ToastData.Duration)
+            
+            local TweenOut = TweenService:Create(ToastFrame, ToastTweenInfo, {Position = StartPos, BackgroundTransparency = 1})
+            TweenOut:Play()
+            TweenOut.Completed:Wait()
+            
+            ToastFrame:Destroy()
+            ShowNextToast()
+        end
+        
+        if not ToastVisible then
+            ShowNextToast()
+        end
+    end
+
     return Window
 end
-
-return Library
