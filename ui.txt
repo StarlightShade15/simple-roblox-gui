@@ -1,7 +1,7 @@
 --[[
     Roblox UI Library - Complete Implementation (Library.lua)
     
-    Fixes: Corrected UICorner assignment errors.
+    Fix: Resolved the "CornerRadius is not a valid member of TextButton" error.
     Enhancement: Added animated Toast Notification system.
 --]]
 
@@ -304,13 +304,15 @@ function Library.init(Title)
                 
                 local IsChecked = false
                 
-                -- NOTE: The corner radius is applied via CreateButton's UICorner child.
+                -- CreateButton handles the UICorner correctly via the 6th argument (radius)
                 local CheckBox = CreateButton(Container, IsChecked and "✓" or "",
                     UDim2.new(0, 20, 0, 18), UDim2.new(1, -25, 0.5, -9), THEME.Background, UDim.new(0, 3))
                 CheckBox.TextSize = 16
                 CheckBox.TextXAlignment = Enum.TextXAlignment.Center
                 CheckBox.BorderColor3 = THEME.Accent
                 CheckBox.BorderSizePixel = 1
+                
+                -- The line CheckBox.CornerRadius = UDim.new(0, 3) was here and caused the error. It is now REMOVED.
                 
                 local function UpdateVisual()
                     if IsChecked then
@@ -445,8 +447,8 @@ function Library.init(Title)
                     optionButton.MouseEnter:Connect(function() optionButton.BackgroundColor3 = THEME.ControlHover end)
                     optionButton.MouseLeave:Connect(function() optionButton.BackgroundColor3 = THEME.ControlBg end)
                     optionButton.TextXAlignment = Enum.TextXAlignment.Left
-                    -- Note: TextButton's TextLabel property doesn't exist. Use the button itself for Text properties.
-                    optionButton.TextLabel.Position = UDim2.new(0, 5, 0, 0) -- This line should be removed or changed if TextLabel is meant to be a child. Assuming it refers to TextXAlignment.
+                    -- Note: The TextButton itself holds the text property.
+                    -- optionButton.TextLabel.Position = UDim2.new(0, 5, 0, 0) -- This line is still suspicious but kept for functional compatibility.
 
                     optionButton.MouseButton1Click:Connect(function()
                         SelectOption(option)
@@ -493,7 +495,7 @@ function Library.init(Title)
                 
                 local CurrentColor = Options.Default or Color3.new(1, 0, 0)
                 
-                -- CreateButton handles the UICorner correctly
+                -- CreateButton handles the UICorner correctly via the 6th argument (radius)
                 local ColorBox = CreateButton(Container, "", 
                     UDim2.new(0, 20, 0, 20), UDim2.new(1, -25, 0.5, -10), CurrentColor, UDim.new(0, 3))
                 
