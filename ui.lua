@@ -1,8 +1,10 @@
 --[[
-    UI Library ModuleScript - FINAL & DEFINITIVE VERSION with Dropdown Toggle Fix
+    UI Library ModuleScript - FINAL CLOSURE FIX
     
-    This version includes the fix for the dropdown not closing when the main button
-    is clicked a second time (making it a proper toggle control).
+    This version implements the fixes for:
+    1. Dropdown options remaining visible (closure fix and failsafe positioning).
+    2. Dropdown remaining open when switching tabs (added close logic to Tab:Select).
+    3. Removed the problematic full-screen InputBlocker.
 --]]
 
 local Library = {}
@@ -108,28 +110,8 @@ function Library.init(Title)
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     ScreenGui.Parent = PlayerGui
 
-    -- Input Blocker for dropdowns 
-    local InputBlocker = Instance.new("Frame")
-    InputBlocker.Name = "InputBlocker"
-    InputBlocker.Size = UDim2.fromScale(1, 1)
-    InputBlocker.BackgroundTransparency = 1
-    InputBlocker.ZIndex = 4 
-    InputBlocker.Active = true 
-    InputBlocker.Visible = false
-    InputBlocker.Parent = ScreenGui
-    Window.InputBlocker = InputBlocker
+    -- NOTE: InputBlocker has been removed to resolve click interference.
     
-    -- FIX: Use InputBegan instead of MouseButton1Click for Frame events
-    -- This handles clicks *outside* the dropdown area
-    InputBlocker.InputBegan:Connect(function(input)
-        if Window.CloseDropdown and InputBlocker.Visible then
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                Window.CloseDropdown()
-            end
-        end
-    end)
-    
-
     -- Main Window Frame
     local W = THEME.WindowSize
     local WindowFrame = CreateBaseFrame(
@@ -250,6 +232,9 @@ function Library.init(Title)
 
         -- Selection Logic setup... 
         function Tab:Select()
+            -- FIX: Close any active dropdown when switching tabs
+            Window.CloseDropdown() 
+            
             for _, childTab in ipairs(Window.Children) do
                 if type(childTab) == "table" and childTab.PageScroll and childTab.Instance then 
                     childTab.PageScroll.Visible = false
@@ -457,13 +442,18 @@ function Library.init(Title)
             end
             
             -- Dropdown
-            local currentDropdownList = nil
+            local currentDropdownList = nil -- Global reference to the currently open list frame
             
+            -- Global function to close any currently open dropdown
             Window.CloseDropdown = function()
                 if currentDropdownList then
-                    currentDropdownList.Visible = false
+                    -- Primary closure mechanism
+                    currentDropdownList.Visible = false 
+                    
+                    -- Failsafe: Move the frame far off-screen to guarantee it's not clickable
+                    currentDropdownList.Position = UDim2.new(0, -9999, 0, -9999)
+
                     currentDropdownList = nil
-                    Window.InputBlocker.Visible = false
                 end
             end
             
@@ -488,17 +478,20 @@ function Library.init(Title)
                 ListLayout.Parent = ListFrame
                 
                 local function OpenList()
-                    -- Calculate correct absolute position and size
+                    -- Get absolute position of the button
                     local absPos = DropdownButton.AbsolutePosition
                     local absSize = DropdownButton.AbsoluteSize
                     
-                    -- Only open if the list is currently closed. Otherwise, close it (the toggle)
-                    if not ListFrame.Visible then
-                        -- Close any *other* previously open dropdown before opening this one
+                    -- TOGGLE LOGIC: 
+                    if currentDropdownList == ListFrame and ListFrame.Visible then
+                        -- If THIS list is already open, close it (toggle)
+                        Window.CloseDropdown()
+                    else
+                        -- Close any *other* open dropdown before opening this one
                         Window.CloseDropdown()
                         
+                        -- Set this list as the currently open one
                         currentDropdownList = ListFrame
-                        Window.InputBlocker.Visible = true
 
                         -- Set position: directly below the button
                         ListFrame.Position = UDim2.fromOffset(absPos.X, absPos.Y + absSize.Y)
@@ -506,9 +499,6 @@ function Library.init(Title)
                         -- Set size: width matches the button's width, height matches list items
                         ListFrame.Size = UDim2.new(0, absSize.X, 0, #Options.List * 20)
                         ListFrame.Visible = true
-                    else
-                        -- FIX: If the button is clicked and the list is already open, close it.
-                        Window.CloseDropdown()
                     end
                 end
 
@@ -517,7 +507,7 @@ function Library.init(Title)
                 local function SelectOption(option)
                     CurrentSelection = option
                     DropdownButton.Text = option
-                    -- This reliably closes the list when an option is selected.
+                    -- Reliably closes the list when an option is selected.
                     Window.CloseDropdown() 
                     if Options.Callback then Options.Callback(option) end
                 end
