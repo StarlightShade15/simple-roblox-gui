@@ -124,13 +124,10 @@ function UILib.init(title)
         })
 
         local pageLayout = new("UIListLayout", { Parent = page, Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder })
-
         new("UIPadding", { Parent = page, PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) })
 
         btn.MouseButton1Click:Connect(function()
-            if Window.Active then
-                Window.Active.page.Visible = false
-            end
+            if Window.Active then Window.Active.page.Visible = false end
             page.Visible = true
             Window.Active = { page = page, btn = btn }
         end)
@@ -166,15 +163,10 @@ function UILib.init(title)
             local lay = new("UIListLayout", { Parent = body, Padding = UDim.new(0, 7) })
 
             lay:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-                task.defer(function()
-                    holder.Size = UDim2.new(1, -20, 0, lay.AbsoluteContentSize.Y + 35)
-                end)
+                task.defer(function() holder.Size = UDim2.new(1, -20, 0, lay.AbsoluteContentSize.Y + 35) end)
             end)
-
             pageLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-                task.defer(function()
-                    page.CanvasSize = UDim2.new(0, 0, 0, pageLayout.AbsoluteContentSize.Y + 20)
-                end)
+                task.defer(function() page.CanvasSize = UDim2.new(0, 0, 0, pageLayout.AbsoluteContentSize.Y + 20) end)
             end)
 
             function Sec:addCheck(cfg)
@@ -190,7 +182,6 @@ function UILib.init(title)
                 })
 
                 local state = cfg.Default and true or false
-
                 local ind = new("Frame", {
                     Parent = b,
                     Size = UDim2.new(0, 22, 0, 22),
@@ -206,6 +197,39 @@ function UILib.init(title)
                 end)
             end
 
+            function Sec:addDropdown(cfg)
+                local frame = new("Frame", { Parent = body, Size = UDim2.new(1, -10, 0, 28), BackgroundColor3 = Color3.fromRGB(50, 50, 50), BorderSizePixel = 0 })
+                local lbl = new("TextLabel", { Parent = frame, Size = UDim2.new(1, -25, 1, 0), BackgroundTransparency = 1, Font = Enum.Font.Gotham, Text = cfg.Text or "", TextColor3 = Color3.new(1, 1, 1), TextSize = 14 })
+                local btn = new("TextButton", { Parent = frame, Size = UDim2.new(0, 22, 0, 22), Position = UDim2.new(1, -24, 0.5, -11), BackgroundColor3 = Color3.fromRGB(70, 70, 70), Text = "▼", TextColor3 = Color3.new(1, 1, 1), Font = Enum.Font.GothamBold, TextSize = 12, BorderSizePixel = 0 })
+                local drop = new("Frame", { Parent = frame, Position = UDim2.new(0, 0, 1, 0), Size = UDim2.new(1, 0, 0, 0), BackgroundColor3 = Color3.fromRGB(45, 45, 45), BorderSizePixel = 0, ClipsDescendants = true })
+                new("UIListLayout", { Parent = drop, SortOrder = Enum.SortOrder.LayoutOrder })
+
+                local open = false
+                btn.MouseButton1Click:Connect(function()
+                    open = not open
+                    tween(drop, { Size = UDim2.new(1, 0, 0, open and (#(cfg.List or {}) * 24) or 0) }, 0.2)
+                end)
+
+                for _, item in ipairs(cfg.List or {}) do
+                    local op = new("TextButton", { Parent = drop, Size = UDim2.new(1, 0, 0, 24), BackgroundColor3 = Color3.fromRGB(55, 55, 55), BorderSizePixel = 0, Font = Enum.Font.Gotham, Text = item, TextColor3 = Color3.new(1, 1, 1), TextSize = 14 })
+                    op.MouseButton1Click:Connect(function()
+                        open = false
+                        tween(drop, { Size = UDim2.new(1, 0, 0, 0) }, 0.2)
+                        if cfg.Callback then cfg.Callback(item) end
+                    end)
+                end
+            end
+
+            function Sec:addInput(cfg)
+                local box = new("TextBox", { Parent = body, Size = UDim2.new(1, -10, 0, 28), BackgroundColor3 = Color3.fromRGB(50, 50, 50), BorderSizePixel = 0, Text = cfg.Default or "", PlaceholderText = cfg.Placeholder or "", Font = Enum.Font.Gotham, TextColor3 = Color3.new(1, 1, 1), TextSize = 14 })
+                box.FocusLost:Connect(function() if cfg.Callback then cfg.Callback(box.Text) end end)
+            end
+
+            function Sec:addColorPicker(cfg)
+                local b = new("TextButton", { Parent = body, Size = UDim2.new(1, -10, 0, 28), BackgroundColor3 = cfg.Default or Color3.fromRGB(255, 255, 255), BorderSizePixel = 0, Text = cfg.Text or "", Font = Enum.Font.Gotham, TextColor3 = Color3.new(1, 1, 1), TextSize = 14 })
+                b.MouseButton1Click:Connect(function() if cfg.Callback then cfg.Callback(cfg.Default, cfg.DefaultAlpha) end end)
+            end
+
             return Sec
         end
 
@@ -217,6 +241,16 @@ function UILib.init(title)
         end
 
         return Tab
+    end
+
+    function Window:Toast(msg, dur)
+        local t = new("TextLabel", { Parent = main, Size = UDim2.new(0, 320, 0, 32), Position = UDim2.new(0.5, -160, 0, -40), BackgroundColor3 = Color3.fromRGB(40, 40, 40), Text = tostring(msg or ""), TextColor3 = Color3.new(1, 1, 1), Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0 })
+        tween(t, { Position = UDim2.new(0.5, -160, 0, 5) }, 0.25)
+        task.delay(math.max(0.5, dur or 2), function()
+            tween(t, { Position = UDim2.new(0.5, -160, 0, -40) }, 0.25)
+            task.wait(0.25)
+            pcall(function() t:Destroy() end)
+        end)
     end
 
     return Window
