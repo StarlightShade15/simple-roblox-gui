@@ -90,13 +90,12 @@ function UILib.init(title)
         ScrollBarThickness = 6
     })
 
-    -- Container for toasts, parented to ScreenGui (sg) for screen-relative positioning
+    -- Container for toasts (Kept as is)
     local toastContainer = new("Frame", {
         Parent = sg,
-        Size = UDim2.new(0, 0, 0, 0), -- Invisible container
+        Size = UDim2.new(0, 0, 0, 0), 
         BackgroundTransparency = 1,
         LayoutOrder = Enum.SortOrder.LayoutOrder,
-        -- Position in the bottom right corner
         Position = UDim2.new(1, 0, 1, 0), 
         AnchorPoint = Vector2.new(1, 1)
     })
@@ -193,17 +192,27 @@ function UILib.init(title)
                 end)
             end
 
-            -- FIX: Dropdown logic (parenting, positioning, and sizing)
+            -- FIX: Dropdown logic (Positioning and Selection)
             function Sec:addDropdown(cfg)
+                local listItems = cfg.List or {}
+                local currentSelection = listItems[1] or ""
+                
                 local frame = new("Frame", { Parent = body, Size = UDim2.new(1, -10, 0, 28), BackgroundColor3 = Color3.fromRGB(50,50,50), BorderSizePixel = 0 })
-                local lbl = new("TextLabel", { Parent = frame, Size = UDim2.new(1, -25, 1, 0), BackgroundTransparency = 1, Font = Enum.Font.Gotham, Text = cfg.Text or "", TextColor3 = Color3.new(1,1,1), TextSize = 14 })
+                local lbl = new("TextLabel", { 
+                    Parent = frame, 
+                    Size = UDim2.new(1, -25, 1, 0), 
+                    BackgroundTransparency = 1, 
+                    Font = Enum.Font.Gotham, 
+                    -- Initialize with current selection
+                    Text = currentSelection, 
+                    TextColor3 = Color3.new(1,1,1), 
+                    TextSize = 14 
+                })
                 local btn = new("TextButton", { Parent = frame, Size = UDim2.new(0,22,0,22), Position = UDim2.new(1,-24,0.5,-11), BackgroundColor3 = Color3.fromRGB(70,70,70), Text = "▼", TextColor3 = Color3.new(1,1,1), Font = Enum.Font.GothamBold, TextSize = 12, BorderSizePixel = 0 })
             
-                -- Dropdown is now parented to the main ScreenGui (sg) to avoid being clipped by the main window/scrolling frame
-                -- We set its position based on the absolute position of the button frame.
                 local drop = new("Frame", { 
-                    Parent = sg, -- FIX: Parent to ScreenGui
-                    Size = UDim2.new(0, 0, 0, 0), -- Start size at 0
+                    Parent = sg, 
+                    Size = UDim2.new(0, 0, 0, 0), 
                     BackgroundColor3 = Color3.fromRGB(45,45,45), 
                     BorderSizePixel = 0, 
                     ClipsDescendants = true, 
@@ -218,19 +227,18 @@ function UILib.init(title)
                         local absPos = frame.AbsolutePosition
                         local dropWidth = frame.AbsoluteSize.X
                         local itemHeight = 24
-                        local listItems = cfg.List or {}
                         local height = (#listItems * itemHeight)
                         local screenHeight = workspace.CurrentCamera.ViewportSize.Y
                         
-                        -- Set position
+                        -- Position directly below the button frame
                         drop.Position = UDim2.new(0, absPos.X, 0, absPos.Y + frame.AbsoluteSize.Y)
                         
                         -- Check for screen boundary collision (drop up if necessary)
                         if drop.Position.Y.Offset + height > screenHeight then
+                            -- If it goes off-screen, place it above the button frame
                             drop.Position = UDim2.new(0, absPos.X, 0, absPos.Y - height)
                         end
                         
-                        -- Set the width to match the button frame's absolute width
                         drop.Size = UDim2.new(0, dropWidth, 0, 0)
                         tween(drop, { Size = UDim2.new(0, dropWidth, 0, height) }, 0.2)
                     else
@@ -238,11 +246,13 @@ function UILib.init(title)
                     end
                 end)
             
-                for _, item in ipairs(cfg.List or {}) do
+                for _, item in ipairs(listItems) do
                     local op = new("TextButton", { Parent = drop, Size = UDim2.new(1,0,0,24), BackgroundColor3 = Color3.fromRGB(55,55,55), BorderSizePixel = 0, Font = Enum.Font.Gotham, Text = item, TextColor3 = Color3.new(1,1,1), TextSize = 14, ZIndex = 11 })
                     op.MouseButton1Click:Connect(function()
-                        -- FIX: Update the button text to show selected item
-                        lbl.Text = item
+                        -- Update the selected state
+                        currentSelection = item
+                        lbl.Text = item 
+
                         open = false
                         tween(drop, { Size = UDim2.new(0, frame.AbsoluteSize.X, 0, 0) }, 0.2)
                         if cfg.Callback then cfg.Callback(item) end
@@ -276,13 +286,12 @@ function UILib.init(title)
         return Tab
     end
 
-    -- FIX: Toast function (Positioned to the bottom right of the screen)
+    -- Toast function (Kept as is)
     function Window:Toast(msg, dur)
         local t = new("TextLabel", { 
-            Parent = toastContainer, -- Parent to the dedicated container
+            Parent = toastContainer, 
             Size = UDim2.new(0, 320, 0, 32), 
-            -- Initial Position: Hidden below the container (or just off-screen to the right)
-            Position = UDim2.new(0, 320, 0, 0), -- Start off-screen (right of its container)
+            Position = UDim2.new(0, 320, 0, 0), 
             BackgroundColor3 = Color3.fromRGB(40, 40, 40), 
             Text = tostring(msg or ""), 
             TextColor3 = Color3.new(1,1,1), 
@@ -291,11 +300,9 @@ function UILib.init(title)
             BorderSizePixel = 0 
         })
         
-        -- Make it slide into the container (no offset from the layout)
         tween(t, { Position = UDim2.new(0, 0, 0, 0) }, 0.25) 
 
         task.delay(math.max(0.5, dur or 2), function()
-            -- Slide out to the right again
             tween(t, { Position = UDim2.new(0, 320, 0, 0) }, 0.25) 
             task.wait(0.25)
             pcall(function() t:Destroy() end)
