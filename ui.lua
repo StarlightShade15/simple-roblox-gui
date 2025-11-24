@@ -4,12 +4,14 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 
+-- Utility function for creating instances
 local function new(class, props)
     local o = Instance.new(class)
     for k,v in pairs(props or {}) do o[k] = v end
     return o
 end
 
+-- Utility function for tweening properties
 local function tween(o, p, t)
     if not o or not p then return end
     local ok, tk = pcall(function()
@@ -34,6 +36,7 @@ function UILib.init(title)
         Active = true
     })
 
+    -- UI DRAGGING LOGIC (Kept as is)
     local dragging, dragStart, startPos
     main.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -52,6 +55,7 @@ function UILib.init(title)
         end
     end)
 
+    -- Header (Kept as is)
     new("TextLabel", {
         Parent = main,
         Size = UDim2.new(1, 0, 0, 40),
@@ -63,7 +67,7 @@ function UILib.init(title)
         TextColor3 = Color3.new(1, 1, 1)
     })
 
-    -- Left vertical tab list
+    -- Left vertical tab list (Kept as is)
     local tabbar = new("Frame", {
         Parent = main,
         Position = UDim2.new(0, 0, 0, 40),
@@ -74,6 +78,7 @@ function UILib.init(title)
     new("UIListLayout", { Parent = tabbar, FillDirection = Enum.FillDirection.Vertical, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6) })
     new("UIPadding", { Parent = tabbar, PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) })
 
+    -- Pages container (Kept as is)
     local pages = new("ScrollingFrame", {
         Parent = main,
         Position = UDim2.new(0, 140, 0, 40),
@@ -85,9 +90,34 @@ function UILib.init(title)
         ScrollBarThickness = 6
     })
 
+    -- Container for toasts, parented to ScreenGui (sg) for screen-relative positioning
+    local toastContainer = new("Frame", {
+        Parent = sg,
+        Size = UDim2.new(0, 0, 0, 0), -- Invisible container
+        BackgroundTransparency = 1,
+        LayoutOrder = Enum.SortOrder.LayoutOrder,
+        -- Position in the bottom right corner
+        Position = UDim2.new(1, 0, 1, 0), 
+        AnchorPoint = Vector2.new(1, 1)
+    })
+    new("UIListLayout", { 
+        Parent = toastContainer, 
+        FillDirection = Enum.FillDirection.Vertical, 
+        HorizontalAlignment = Enum.HorizontalAlignment.Right,
+        VerticalAlignment = Enum.VerticalAlignment.Bottom,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 10)
+    })
+    new("UIPadding", {
+        Parent = toastContainer,
+        PaddingRight = UDim.new(0, 15),
+        PaddingBottom = UDim.new(0, 15)
+    })
+
     Window.Tabs = {}
     Window.Active = nil
 
+    -- addTab function (Kept as is)
     function Window:addTab(name)
         local Tab = {}
         local btn = new("TextButton", {
@@ -112,7 +142,7 @@ function UILib.init(title)
 
         local page = new("Frame", { Parent = pages, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Visible = false })
 
-        -- Horizontal container for sections
+        -- Horizontal container for sections (Kept as is)
         local leftColumn = new("Frame", { Parent = page, Size = UDim2.new(0.5, -5, 1, 0), BackgroundTransparency = 1 })
         local rightColumn = new("Frame", { Parent = page, Size = UDim2.new(0.5, -5, 1, 0), Position = UDim2.new(0.5, 10, 0, 0), BackgroundTransparency = 1 })
 
@@ -126,6 +156,7 @@ function UILib.init(title)
             Window.Active = { page = page, btn = btn }
         end)
 
+        -- addSection function (Kept as is)
         function Tab:addSection(secName, column)
             local parentColumn
             if column == "left" then parentColumn = leftColumn
@@ -150,6 +181,7 @@ function UILib.init(title)
                 end)
             end)
 
+            -- addCheck function (Kept as is)
             function Sec:addCheck(cfg)
                 local b = new("TextButton", { Parent = body, Size = UDim2.new(1, -10, 0, 28), BackgroundColor3 = Color3.fromRGB(50,50,50), Font = Enum.Font.Gotham, Text = cfg.Text or "", TextSize = 14, TextColor3 = Color3.new(1,1,1), BorderSizePixel = 0 })
                 local state = cfg.Default and true or false
@@ -161,12 +193,22 @@ function UILib.init(title)
                 end)
             end
 
+            -- FIX: Dropdown logic (parenting, positioning, and sizing)
             function Sec:addDropdown(cfg)
                 local frame = new("Frame", { Parent = body, Size = UDim2.new(1, -10, 0, 28), BackgroundColor3 = Color3.fromRGB(50,50,50), BorderSizePixel = 0 })
                 local lbl = new("TextLabel", { Parent = frame, Size = UDim2.new(1, -25, 1, 0), BackgroundTransparency = 1, Font = Enum.Font.Gotham, Text = cfg.Text or "", TextColor3 = Color3.new(1,1,1), TextSize = 14 })
                 local btn = new("TextButton", { Parent = frame, Size = UDim2.new(0,22,0,22), Position = UDim2.new(1,-24,0.5,-11), BackgroundColor3 = Color3.fromRGB(70,70,70), Text = "▼", TextColor3 = Color3.new(1,1,1), Font = Enum.Font.GothamBold, TextSize = 12, BorderSizePixel = 0 })
             
-                local drop = new("Frame", { Parent = Window.Instance, Size = UDim2.new(0, 200, 0, 0), BackgroundColor3 = Color3.fromRGB(45,45,45), BorderSizePixel = 0, ClipsDescendants = true, ZIndex = 10 })
+                -- Dropdown is now parented to the main ScreenGui (sg) to avoid being clipped by the main window/scrolling frame
+                -- We set its position based on the absolute position of the button frame.
+                local drop = new("Frame", { 
+                    Parent = sg, -- FIX: Parent to ScreenGui
+                    Size = UDim2.new(0, 0, 0, 0), -- Start size at 0
+                    BackgroundColor3 = Color3.fromRGB(45,45,45), 
+                    BorderSizePixel = 0, 
+                    ClipsDescendants = true, 
+                    ZIndex = 10 
+                })
                 new("UIListLayout", { Parent = drop, SortOrder = Enum.SortOrder.LayoutOrder })
             
                 local open = false
@@ -174,13 +216,23 @@ function UILib.init(title)
                     open = not open
                     if open then
                         local absPos = frame.AbsolutePosition
-                        drop.Position = UDim2.new(0, absPos.X, 0, absPos.Y + frame.AbsoluteSize.Y)
-                        local height = (#(cfg.List or {}) * 24)
+                        local dropWidth = frame.AbsoluteSize.X
+                        local itemHeight = 24
+                        local listItems = cfg.List or {}
+                        local height = (#listItems * itemHeight)
                         local screenHeight = workspace.CurrentCamera.ViewportSize.Y
+                        
+                        -- Set position
+                        drop.Position = UDim2.new(0, absPos.X, 0, absPos.Y + frame.AbsoluteSize.Y)
+                        
+                        -- Check for screen boundary collision (drop up if necessary)
                         if drop.Position.Y.Offset + height > screenHeight then
                             drop.Position = UDim2.new(0, absPos.X, 0, absPos.Y - height)
                         end
-                        tween(drop, { Size = UDim2.new(0, frame.AbsoluteSize.X, 0, height) }, 0.2)
+                        
+                        -- Set the width to match the button frame's absolute width
+                        drop.Size = UDim2.new(0, dropWidth, 0, 0)
+                        tween(drop, { Size = UDim2.new(0, dropWidth, 0, height) }, 0.2)
                     else
                         tween(drop, { Size = UDim2.new(0, frame.AbsoluteSize.X, 0, 0) }, 0.2)
                     end
@@ -189,6 +241,8 @@ function UILib.init(title)
                 for _, item in ipairs(cfg.List or {}) do
                     local op = new("TextButton", { Parent = drop, Size = UDim2.new(1,0,0,24), BackgroundColor3 = Color3.fromRGB(55,55,55), BorderSizePixel = 0, Font = Enum.Font.Gotham, Text = item, TextColor3 = Color3.new(1,1,1), TextSize = 14, ZIndex = 11 })
                     op.MouseButton1Click:Connect(function()
+                        -- FIX: Update the button text to show selected item
+                        lbl.Text = item
                         open = false
                         tween(drop, { Size = UDim2.new(0, frame.AbsoluteSize.X, 0, 0) }, 0.2)
                         if cfg.Callback then cfg.Callback(item) end
@@ -196,11 +250,13 @@ function UILib.init(title)
                 end
             end
 
+            -- addInput function (Kept as is)
             function Sec:addInput(cfg)
                 local box = new("TextBox", { Parent = body, Size = UDim2.new(1, -10, 0, 28), BackgroundColor3 = Color3.fromRGB(50,50,50), BorderSizePixel = 0, Text = cfg.Default or "", PlaceholderText = cfg.Placeholder or "", Font = Enum.Font.Gotham, TextColor3 = Color3.new(1,1,1), TextSize = 14 })
                 box.FocusLost:Connect(function() if cfg.Callback then cfg.Callback(box.Text) end end)
             end
 
+            -- addColorPicker function (Kept as is)
             function Sec:addColorPicker(cfg)
                 local b = new("TextButton", { Parent = body, Size = UDim2.new(1, -10, 0, 28), BackgroundColor3 = cfg.Default or Color3.fromRGB(255,255,255), BorderSizePixel = 0, Text = cfg.Text or "", Font = Enum.Font.Gotham, TextColor3 = Color3.new(1,1,1), TextSize = 14 })
                 b.MouseButton1Click:Connect(function() if cfg.Callback then cfg.Callback(cfg.Default, cfg.DefaultAlpha) end end)
@@ -220,11 +276,27 @@ function UILib.init(title)
         return Tab
     end
 
+    -- FIX: Toast function (Positioned to the bottom right of the screen)
     function Window:Toast(msg, dur)
-        local t = new("TextLabel", { Parent = main, Size = UDim2.new(0, 320, 0, 32), Position = UDim2.new(0.5, -160, 0, -40), BackgroundColor3 = Color3.fromRGB(40, 40, 40), Text = tostring(msg or ""), TextColor3 = Color3.new(1,1,1), Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0 })
-        tween(t, { Position = UDim2.new(0.5, -160, 0, 5) }, 0.25)
+        local t = new("TextLabel", { 
+            Parent = toastContainer, -- Parent to the dedicated container
+            Size = UDim2.new(0, 320, 0, 32), 
+            -- Initial Position: Hidden below the container (or just off-screen to the right)
+            Position = UDim2.new(0, 320, 0, 0), -- Start off-screen (right of its container)
+            BackgroundColor3 = Color3.fromRGB(40, 40, 40), 
+            Text = tostring(msg or ""), 
+            TextColor3 = Color3.new(1,1,1), 
+            Font = Enum.Font.GothamBold, 
+            TextSize = 14, 
+            BorderSizePixel = 0 
+        })
+        
+        -- Make it slide into the container (no offset from the layout)
+        tween(t, { Position = UDim2.new(0, 0, 0, 0) }, 0.25) 
+
         task.delay(math.max(0.5, dur or 2), function()
-            tween(t, { Position = UDim2.new(0.5, -160, 0, -40) }, 0.25)
+            -- Slide out to the right again
+            tween(t, { Position = UDim2.new(0, 320, 0, 0) }, 0.25) 
             task.wait(0.25)
             pcall(function() t:Destroy() end)
         end)
