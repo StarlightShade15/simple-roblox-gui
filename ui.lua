@@ -63,6 +63,7 @@ function UILib.init(title)
         TextColor3 = Color3.new(1, 1, 1)
     })
 
+    -- Left vertical tab list
     local tabbar = new("Frame", {
         Parent = main,
         Position = UDim2.new(0, 0, 0, 40),
@@ -113,6 +114,11 @@ function UILib.init(title)
         local pageLayout = new("UIListLayout", { Parent = page, Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder })
         new("UIPadding", { Parent = page, PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) })
 
+        -- Section columns
+        local leftColumn = new("Frame", { Parent = page, Size = UDim2.new(0.5, -5, 1, 0), BackgroundTransparency = 1 })
+        local rightColumn = new("Frame", { Parent = page, Size = UDim2.new(0.5, -5, 1, 0), Position = UDim2.new(0.5, 10, 0, 0), BackgroundTransparency = 1 })
+        local nextColumn = "left"
+
         btn.MouseButton1Click:Connect(function()
             if Window.Active then
                 Window.Active.page.Visible = false
@@ -124,17 +130,19 @@ function UILib.init(title)
         end)
 
         function Tab:addSection(secName)
-            local Sec = {}
+            local parentColumn = (nextColumn == "left") and leftColumn or rightColumn
+            nextColumn = (nextColumn == "left") and "right" or "left"
 
-            local holder = new("Frame", { Parent = page, Size = UDim2.new(1, -20, 0, 50), BackgroundColor3 = Color3.fromRGB(32, 32, 32), BorderSizePixel = 0 })
-            new("TextLabel", { Parent = holder, Size = UDim2.new(1, 0, 0, 28), BackgroundColor3 = Color3.fromRGB(45, 45, 45), BorderSizePixel = 0, Font = Enum.Font.GothamBold, Text = secName, TextSize = 14, TextColor3 = Color3.new(1, 1, 1) })
+            local Sec = {}
+            local holder = new("Frame", { Parent = parentColumn, Size = UDim2.new(1, 0, 0, 50), BackgroundColor3 = Color3.fromRGB(32,32,32), BorderSizePixel = 0 })
+            new("TextLabel", { Parent = holder, Size = UDim2.new(1, 0, 0, 28), BackgroundColor3 = Color3.fromRGB(45,45,45), BorderSizePixel = 0, Font = Enum.Font.GothamBold, Text = secName, TextSize = 14, TextColor3 = Color3.new(1,1,1) })
 
             local body = new("Frame", { Parent = holder, Position = UDim2.new(0, 0, 0, 28), Size = UDim2.new(1, 0, 1, -28), BackgroundTransparency = 1 })
             local lay = new("UIListLayout", { Parent = body, Padding = UDim.new(0, 7) })
 
             lay:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
                 task.defer(function()
-                    holder.Size = UDim2.new(1, -20, 0, lay.AbsoluteContentSize.Y + 35)
+                    holder.Size = UDim2.new(1, 0, 0, lay.AbsoluteContentSize.Y + 35)
                 end)
             end)
 
@@ -144,13 +152,14 @@ function UILib.init(title)
                 end)
             end)
 
+            -- Methods for addCheck, addDropdown, addInput, addColorPicker remain unchanged
             function Sec:addCheck(cfg)
-                local b = new("TextButton", { Parent = body, Size = UDim2.new(1, -10, 0, 28), BackgroundColor3 = Color3.fromRGB(50, 50, 50), Font = Enum.Font.Gotham, Text = cfg.Text or "", TextSize = 14, TextColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0 })
+                local b = new("TextButton", { Parent = body, Size = UDim2.new(1, -10, 0, 28), BackgroundColor3 = Color3.fromRGB(50,50,50), Font = Enum.Font.Gotham, Text = cfg.Text or "", TextSize = 14, TextColor3 = Color3.new(1,1,1), BorderSizePixel = 0 })
                 local state = cfg.Default and true or false
-                local ind = new("Frame", { Parent = b, Size = UDim2.new(0, 22, 0, 22), Position = UDim2.new(1, -26, 0.5, -11), BackgroundColor3 = state and Color3.fromRGB(0, 255, 80) or Color3.fromRGB(80, 80, 80), BorderSizePixel = 0 })
+                local ind = new("Frame", { Parent = b, Size = UDim2.new(0, 22, 0, 22), Position = UDim2.new(1, -26, 0.5, -11), BackgroundColor3 = state and Color3.fromRGB(0,255,80) or Color3.fromRGB(80,80,80), BorderSizePixel = 0 })
                 b.MouseButton1Click:Connect(function()
                     state = not state
-                    tween(ind, { BackgroundColor3 = state and Color3.fromRGB(0, 255, 80) or Color3.fromRGB(80, 80, 80) }, 0.15)
+                    tween(ind, { BackgroundColor3 = state and Color3.fromRGB(0,255,80) or Color3.fromRGB(80,80,80) }, 0.15)
                     if cfg.Callback then cfg.Callback(state) end
                 end)
             end
@@ -168,11 +177,13 @@ function UILib.init(title)
                 btn.MouseButton1Click:Connect(function()
                     open = not open
                     if open then
-                        drop.Position = UDim2.new(0, frame.AbsolutePosition.X, 0, frame.AbsolutePosition.Y + frame.AbsoluteSize.Y)
+                        local absX = frame.AbsolutePosition.X
+                        local absY = frame.AbsolutePosition.Y
+                        drop.Position = UDim2.new(0, absX, 0, absY + frame.AbsoluteSize.Y)
                         local height = (#(cfg.List or {}) * 24)
                         local screenHeight = workspace.CurrentCamera.ViewportSize.Y
                         if drop.Position.Y.Offset + height > screenHeight then
-                            drop.Position = UDim2.new(0, frame.AbsolutePosition.X, 0, frame.AbsolutePosition.Y - height)
+                            drop.Position = UDim2.new(0, absX, 0, absY - height)
                         end
                         tween(drop, { Size = UDim2.new(0, 200, 0, height) }, 0.2)
                     else
@@ -180,21 +191,8 @@ function UILib.init(title)
                     end
                 end)
 
-                task.spawn(function()
-                    while task.wait(0.03) do
-                        if open then
-                            drop.Position = UDim2.new(0, frame.AbsolutePosition.X, 0, frame.AbsolutePosition.Y + frame.AbsoluteSize.Y)
-                            local height = (#(cfg.List or {}) * 24)
-                            local screenHeight = workspace.CurrentCamera.ViewportSize.Y
-                            if drop.Position.Y.Offset + height > screenHeight then
-                                drop.Position = UDim2.new(0, frame.AbsolutePosition.X, 0, frame.AbsolutePosition.Y - height)
-                            end
-                        end
-                    end
-                end)
-
                 for _, item in ipairs(cfg.List or {}) do
-                    local op = new("TextButton", { Parent = drop, Size = UDim2.new(1, 0, 0, 24), BackgroundColor3 = Color3.fromRGB(55, 55, 55), BorderSizePixel = 0, Font = Enum.Font.Gotham, Text = item, TextColor3 = Color3.new(1, 1, 1), TextSize = 14, ZIndex = 11 })
+                    local op = new("TextButton", { Parent = drop, Size = UDim2.new(1, 0, 0, 24), BackgroundColor3 = Color3.fromRGB(55,55,55), BorderSizePixel = 0, Font = Enum.Font.Gotham, Text = item, TextColor3 = Color3.new(1,1,1), TextSize = 14, ZIndex = 11 })
                     op.MouseButton1Click:Connect(function()
                         open = false
                         tween(drop, { Size = UDim2.new(0, 200, 0, 0) }, 0.2)
@@ -204,12 +202,12 @@ function UILib.init(title)
             end
 
             function Sec:addInput(cfg)
-                local box = new("TextBox", { Parent = body, Size = UDim2.new(1, -10, 0, 28), BackgroundColor3 = Color3.fromRGB(50, 50, 50), BorderSizePixel = 0, Text = cfg.Default or "", PlaceholderText = cfg.Placeholder or "", Font = Enum.Font.Gotham, TextColor3 = Color3.new(1, 1, 1), TextSize = 14 })
+                local box = new("TextBox", { Parent = body, Size = UDim2.new(1, -10, 0, 28), BackgroundColor3 = Color3.fromRGB(50,50,50), BorderSizePixel = 0, Text = cfg.Default or "", PlaceholderText = cfg.Placeholder or "", Font = Enum.Font.Gotham, TextColor3 = Color3.new(1,1,1), TextSize = 14 })
                 box.FocusLost:Connect(function() if cfg.Callback then cfg.Callback(box.Text) end end)
             end
 
             function Sec:addColorPicker(cfg)
-                local b = new("TextButton", { Parent = body, Size = UDim2.new(1, -10, 0, 28), BackgroundColor3 = cfg.Default or Color3.fromRGB(255, 255, 255), BorderSizePixel = 0, Text = cfg.Text or "", Font = Enum.Font.Gotham, TextColor3 = Color3.new(1, 1, 1), TextSize = 14 })
+                local b = new("TextButton", { Parent = body, Size = UDim2.new(1, -10, 0, 28), BackgroundColor3 = cfg.Default or Color3.fromRGB(255,255,255), BorderSizePixel = 0, Text = cfg.Text or "", Font = Enum.Font.Gotham, TextColor3 = Color3.new(1,1,1), TextSize = 14 })
                 b.MouseButton1Click:Connect(function() if cfg.Callback then cfg.Callback(cfg.Default, cfg.DefaultAlpha) end end)
             end
 
@@ -228,7 +226,7 @@ function UILib.init(title)
     end
 
     function Window:Toast(msg, dur)
-        local t = new("TextLabel", { Parent = main, Size = UDim2.new(0, 320, 0, 32), Position = UDim2.new(0.5, -160, 0, -40), BackgroundColor3 = Color3.fromRGB(40, 40, 40), Text = tostring(msg or ""), TextColor3 = Color3.new(1, 1, 1), Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0 })
+        local t = new("TextLabel", { Parent = main, Size = UDim2.new(0, 320, 0, 32), Position = UDim2.new(0.5, -160, 0, -40), BackgroundColor3 = Color3.fromRGB(40, 40, 40), Text = tostring(msg or ""), TextColor3 = Color3.new(1,1,1), Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0 })
         tween(t, { Position = UDim2.new(0.5, -160, 0, 5) }, 0.25)
         task.delay(math.max(0.5, dur or 2), function()
             tween(t, { Position = UDim2.new(0.5, -160, 0, -40) }, 0.25)
