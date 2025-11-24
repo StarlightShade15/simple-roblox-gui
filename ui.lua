@@ -170,8 +170,6 @@ function UILib.init(title)
                 btn.MouseButton1Click:Connect(function()
                     open = not open
                     if open then
-                        drop.Parent = main
-                        drop.ZIndex = 10
                         drop.Position = UDim2.new(0, frame.AbsolutePosition.X, 0, frame.AbsolutePosition.Y + frame.AbsoluteSize.Y)
                         local height = (#(cfg.List or {}) * 24)
                         local screenHeight = workspace.CurrentCamera.ViewportSize.Y
@@ -182,7 +180,6 @@ function UILib.init(title)
                     else
                         tween(drop, { Size = UDim2.new(0, 200, 0, 0) }, 0.2)
                     end
-                    drop:BringToFront()
                 end)
             
                 task.spawn(function()
@@ -194,7 +191,6 @@ function UILib.init(title)
                             if drop.Position.Y.Offset + height > screenHeight then
                                 drop.Position = UDim2.new(0, frame.AbsolutePosition.X, 0, frame.AbsolutePosition.Y - height)
                             end
-                            drop:BringToFront()
                         end
                     end
                 end)
