@@ -192,12 +192,14 @@ function UILib.init(title)
                 end)
             end
 
-            -- FINAL FIX: Dropdown logic (Parenting, Relative Positioning, and Scrolling Offset)
             function Sec:addDropdown(cfg)
                 local listItems = cfg.List or {}
                 local currentSelection = listItems[1] or ""
                 
+                -- The main button frame
                 local frame = new("Frame", { Parent = body, Size = UDim2.new(1, -10, 0, 28), BackgroundColor3 = Color3.fromRGB(50,50,50), BorderSizePixel = 0 })
+                
+                -- Text label showing current selection
                 local lbl = new("TextLabel", { 
                     Parent = frame, 
                     Size = UDim2.new(1, -25, 1, 0), 
@@ -207,9 +209,21 @@ function UILib.init(title)
                     TextColor3 = Color3.new(1,1,1), 
                     TextSize = 14 
                 })
-                local btn = new("TextButton", { Parent = frame, Size = UDim2.new(0,22,0,22), Position = UDim2.new(1,-24,0.5,-11), BackgroundColor3 = Color3.fromRGB(70,70,70), Text = "▼", TextColor3 = Color3.new(1,1,1), Font = Enum.Font.GothamBold, TextSize = 12, BorderSizePixel = 0 })
+                
+                -- Dropdown toggle button
+                local btn = new("TextButton", { 
+                    Parent = frame, 
+                    Size = UDim2.new(0,22,0,22), 
+                    Position = UDim2.new(1,-24,0.5,-11), 
+                    BackgroundColor3 = Color3.fromRGB(70,70,70), 
+                    Text = "▼", 
+                    TextColor3 = Color3.new(1,1,1), 
+                    Font = Enum.Font.GothamBold, 
+                    TextSize = 12, 
+                    BorderSizePixel = 0 
+                })
             
-                -- Parent to the main window ('main') so it moves with the draggable window
+                -- Dropdown options container (Parented to 'main' for window dragging support)
                 local drop = new("Frame", { 
                     Parent = main, 
                     Size = UDim2.new(0, 0, 0, 0), 
@@ -221,44 +235,70 @@ function UILib.init(title)
                 new("UIListLayout", { Parent = drop, SortOrder = Enum.SortOrder.LayoutOrder })
             
                 local open = false
+                
+                -- Function to calculate the correct position relative to the 'main' window
+                local function calculatePosition()
+                    local absPos = frame.AbsolutePosition
+                    local mainAbsPos = main.AbsolutePosition
+                    local dropWidth = frame.AbsoluteSize.X
+                    local itemHeight = 24
+                    local height = (#listItems * itemHeight)
+                    local screenHeight = workspace.CurrentCamera.ViewportSize.Y
+                    
+                    -- Calculate the necessary offset from the top-left of the main window
+                    local xOffset = absPos.X - mainAbsPos.X
+                    local yOffset = absPos.Y - mainAbsPos.Y + frame.AbsoluteSize.Y -- Place below button
+
+                    -- Check for screen boundary collision (drop up if necessary)
+                    if (mainAbsPos.Y + yOffset + height) > screenHeight then
+                        -- Calculate new Y offset to place it ABOVE the button
+                        yOffset = absPos.Y - mainAbsPos.Y - height
+                    end
+                    
+                    return xOffset, yOffset, dropWidth, height
+                end
+
                 btn.MouseButton1Click:Connect(function()
                     open = not open
+                    
                     if open then
-                        local dropWidth = frame.AbsoluteSize.X
-                        local itemHeight = 24
-                        local height = (#listItems * itemHeight)
-                        local screenHeight = workspace.CurrentCamera.ViewportSize.Y
+                        local xOffset, yOffset, dropWidth, height = calculatePosition()
                         
-                        -- 1. Get position of the button frame relative to the main window's content area (pages)
-                        local relativePos = frame.AbsolutePosition - pages.AbsolutePosition
-                        
-                        -- 2. Calculate the final position relative to the main window (main)
-                        -- The dropdown must align with the main window's X-offset (140) + the page frame's X-offset (relativePos.X)
-                        -- And the main window's Y-offset (40) + the page frame's Y-offset (relativePos.Y) + button height
-                        
-                        local xOffset = 140 + relativePos.X
-                        local yOffset = 40 + relativePos.Y + frame.AbsoluteSize.Y
-                        
+                        -- Set position and initialize width before the tween
                         drop.Position = UDim2.new(0, xOffset, 0, yOffset)
-                        
-                        -- 3. Check for screen boundary collision (requires AbsolutePosition of the dropdown)
-                        local dropAbsY = main.AbsolutePosition.Y + yOffset
-                        if dropAbsY + height > screenHeight then
-                            -- Calculate new Y offset to place it ABOVE the button
-                            yOffset = 40 + relativePos.Y - height
-                            drop.Position = UDim2.new(0, xOffset, 0, yOffset)
-                        end
-                        
                         drop.Size = UDim2.new(0, dropWidth, 0, 0)
+                        
+                        -- Tween to full height
                         tween(drop, { Size = UDim2.new(0, dropWidth, 0, height) }, 0.2)
                     else
+                        -- Tween to 0 height
                         tween(drop, { Size = UDim2.new(0, frame.AbsoluteSize.X, 0, 0) }, 0.2)
                     end
                 end)
-            
+                
+                -- To prevent the dropdown from getting misplaced if the main window moves while the dropdown is open:
+                main.Position:GetPropertyChangedSignal("Offset"):Connect(function()
+                    if open then
+                        local xOffset, yOffset, _, _ = calculatePosition()
+                        drop.Position = UDim2.new(0, xOffset, 0, yOffset)
+                    end
+                end)
+                
+                -- Item list generation
                 for _, item in ipairs(listItems) do
-                    local op = new("TextButton", { Parent = drop, Size = UDim2.new(1,0,0,24), BackgroundColor3 = Color3.fromRGB(55,55,55), BorderSizePixel = 0, Font = Enum.Font.Gotham, Text = item, TextColor3 = Color3.new(1,1,1), TextSize = 14, ZIndex = 11 })
+                    local op = new("TextButton", { 
+                        Parent = drop, 
+                        Size = UDim2.new(1,0,0,24), 
+                        BackgroundColor3 = Color3.fromRGB(55,55,55), 
+                        BorderSizePixel = 0, 
+                        Font = Enum.Font.Gotham, 
+                        Text = item, 
+                        TextColor3 = Color3.new(1,1,1), 
+                        TextSize = 14, 
+                        ZIndex = 11 
+                    })
                     op.MouseButton1Click:Connect(function()
+                        -- Update the selected state and close
                         currentSelection = item
                         lbl.Text = item 
 
