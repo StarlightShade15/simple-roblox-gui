@@ -49,8 +49,8 @@ function UILib.init(title)
     local sg = new("ScreenGui", { Parent = parentGui, ResetOnSpawn = false, IgnoreGuiInset = true })
     local main = new("Frame", {
         Parent = sg,
-        Size = UDim2.new(0, 550, 0, 380),
-        Position = UDim2.new(0.5, -275, 0.5, -190),
+        Size = UDim2.new(0, 700, 0, 420),
+        Position = UDim2.new(0.5, -350, 0.5, -210),
         BackgroundColor3 = Color3.fromRGB(28, 28, 28),
         BorderSizePixel = 0,
         Active = true
@@ -87,22 +87,24 @@ function UILib.init(title)
 
     local tabbar = new("Frame", {
         Parent = main,
-        Position = UDim2.new(0, 0, 0, 40),
-        Size = UDim2.new(1, 0, 0, 35),
+        Position = UDim2.new(1, -140, 0, 40),
+        Size = UDim2.new(0, 140, 1, -75),
         BackgroundColor3 = Color3.fromRGB(32, 32, 32),
         BorderSizePixel = 0
     })
 
     local tablist = new("UIListLayout", {
         Parent = tabbar,
-        FillDirection = Enum.FillDirection.Horizontal,
-        SortOrder = Enum.SortOrder.LayoutOrder
+        FillDirection = Enum.FillDirection.Vertical,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 6)
     })
+    new("UIPadding", { Parent = tabbar, PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) })
 
     local pages = new("Frame", {
         Parent = main,
         Position = UDim2.new(0, 0, 0, 75),
-        Size = UDim2.new(1, 0, 1, -75),
+        Size = UDim2.new(1, -140, 1, -75),
         BackgroundColor3 = Color3.fromRGB(25, 25, 25),
         BorderSizePixel = 0
     })
@@ -115,7 +117,7 @@ function UILib.init(title)
         local Tab = {}
         local btn = new("TextButton", {
             Parent = tabbar,
-            Size = UDim2.new(0, 120, 1, 0),
+            Size = UDim2.new(1, 0, 0, 36),
             BackgroundColor3 = Color3.fromRGB(40, 40, 40),
             BorderSizePixel = 0,
             Font = Enum.Font.GothamBold,
@@ -131,12 +133,12 @@ function UILib.init(title)
             BackgroundTransparency = 1,
             BorderSizePixel = 0,
             Visible = false,
-            ScrollBarThickness = 4,
+            ScrollBarThickness = 6,
             AutomaticCanvasSize = Enum.AutomaticSize.Y
         })
 
         local pageLayout = new("UIListLayout", { Parent = page, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder })
-        new("UIPadding", { Parent = page, PaddingLeft = UDim.new(0, 10), PaddingTop = UDim.new(0, 10) })
+        new("UIPadding", { Parent = page, PaddingLeft = UDim.new(0, 12), PaddingTop = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) })
 
         btn.MouseButton1Click:Connect(function()
             if Window.Active then Window.Active.page.Visible = false end
@@ -181,11 +183,14 @@ function UILib.init(title)
             local function resize()
                 task.defer(function()
                     holder.Size = UDim2.new(1, -20, 0, lay.AbsoluteContentSize.Y + 35)
-                    page.CanvasSize = UDim2.new(0, 0, 0, pageLayout.AbsoluteContentSize.Y + 20)
                 end)
             end
             lay:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(resize)
-            pageLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(resize)
+            pageLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                task.defer(function()
+                    pcall(function() page.CanvasSize = UDim2.new(0, 0, 0, pageLayout.AbsoluteContentSize.Y + 20) end)
+                end)
+            end)
             resize()
 
             function Sec:addCheck(cfg)
