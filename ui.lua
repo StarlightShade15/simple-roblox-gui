@@ -150,7 +150,7 @@ function lib.Init(title,corner)
         local lbl=lib.makeText(f,text,Vector2.new(0,30),Color3.new(1,1,1))
         lbl.Size=UDim2.new(0.7,0,1,0)
         local box=lib.makeRect(f,Vector2.new(20,20),default and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0),nil,3)
-        box.Position=UDim2.new(0.75,0,0.5,-10)
+        box.Position = UDim2.new(0.75,0,0.5,-10)
         local toggled=default
         f.InputBegan:Connect(function(input)
             if input.UserInputType==Enum.UserInputType.MouseButton1 then
@@ -197,7 +197,8 @@ function lib.Init(title,corner)
             optBtn.MouseButton1Click:Connect(function()
                 selected.Text=opt
                 dropFrame:TweenSize(UDim2.new(0,150,0,0),"Out","Quad",0.15,true)
-                wait(0.15) dropFrame.Visible=false
+                wait(0.15)
+                dropFrame.Visible=false
                 if callback then callback(opt) end
             end)
         end
