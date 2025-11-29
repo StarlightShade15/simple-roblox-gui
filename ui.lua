@@ -278,7 +278,7 @@ function lib.Init(title, corner)
 
     local function createSection(tab, sectionName)
         local section = lib.makeRect(tab.frame, Vector2.new(0, 0), UI_SECTION_COLOR, nil, CORNER_RADIUS)
-        section.Size = UDim2.new(1, 0, 0, 0) -- Start with zero height, adjusted by layout
+        section.Size = UDim2.new(1, 0, 0, 0) 
 
         local title = lib.makeText(section, sectionName, Vector2.new(0, 25), UI_TEXT_COLOR, Enum.TextXAlignment.Left)
         title.Size = UDim2.new(1, -20, 0, 25)
@@ -287,7 +287,7 @@ function lib.Init(title, corner)
         title.TextSize = 16
 
         local secContent = Instance.new("Frame")
-        -- Content frame is slightly inset and takes the remaining height
+        -- Corrected Size: takes 100% width, height is controlled by list layout
         c(secContent, {Parent = section, Size = UDim2.new(1, -20, 1, -35), Position = UDim2.new(0, 10, 0, 30), BackgroundTransparency = 1})
 
         local layout = Instance.new("UIListLayout")
@@ -296,7 +296,7 @@ function lib.Init(title, corner)
         layout.Parent = secContent
 
         layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            -- Set the section height based on its content plus padding
+            -- Set the section height based on its content plus header height and padding
             section.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y + 40)
         end)
 
@@ -314,14 +314,13 @@ function lib.Init(title, corner)
     end
 
     local function addSeparator(section)
-        -- Separator should use UI_SECTION_COLOR to contrast with elements, or UI_BG_COLOR for a strong divider
         local s = lib.makeRect(section.content, Vector2.new(0, 2), UI_SECTION_COLOR, nil, 0)
         s.Size = UDim2.new(1, 0, 0, 2)
         return s
     end
 
     local function addButton(section, text, callback, keybind)
-        -- Element background color and UICorner applied
+        -- Uses UDim2.new(1, 0, 0, 35) to fill the width of the secContent container
         local b = lib.makeRect(section.content, Vector2.new(0, 35), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
         b.Size = UDim2.new(1, 0, 0, 35)
 
@@ -339,7 +338,7 @@ function lib.Init(title, corner)
     end
 
     local function addToggle(section, text, default, callback, keybind, mode)
-        -- Element background color and UICorner applied
+        -- Uses UDim2.new(1, 0, 0, 35) to fill the width of the secContent container
         local f = lib.makeRect(section.content, Vector2.new(0, 35), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
         f.Size = UDim2.new(1, 0, 0, 35)
 
@@ -406,7 +405,7 @@ function lib.Init(title, corner)
 
     local function addSlider(section, text, min, max, default, callback)
         local frameHeight = 45
-        -- Element background color and UICorner applied
+        -- Uses UDim2.new(1, 0, 0, 45) to fill the width of the secContent container
         local f = lib.makeRect(section.content, Vector2.new(0, frameHeight), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
         f.Size = UDim2.new(1, 0, 0, frameHeight)
 
