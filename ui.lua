@@ -582,7 +582,7 @@ function lib.Init(title, corner)
         visible = not visible
         local duration = 0.25
         local tweenInfoIn = TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        local tweenInfoOut = TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        local tweenInfoOut = TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, 0.5)
 
         if not visible then closeAllDropdowns() end
         
