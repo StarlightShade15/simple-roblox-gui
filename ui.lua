@@ -4,12 +4,13 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 
-local UI_BG_COLOR = Color3.fromRGB(35, 39, 42)
-local UI_ELEMENT_COLOR = Color3.fromRGB(44, 47, 51)
-local UI_SECTION_COLOR = Color3.fromRGB(54, 57, 63)
-local UI_ACCENT_COLOR = Color3.fromRGB(88, 101, 242)
-local UI_TOGGLE_ON = Color3.fromRGB(67, 181, 129)
-local UI_TOGGLE_OFF = Color3.fromRGB(240, 71, 71)
+-- Define Colors
+local UI_BG_COLOR = Color3.fromRGB(35, 39, 42)      -- Main window background
+local UI_ELEMENT_COLOR = Color3.fromRGB(44, 47, 51)  -- Element background (Buttons, Toggles, Sliders)
+local UI_SECTION_COLOR = Color3.fromRGB(54, 57, 63)  -- Section background (Auto-Clicker box)
+local UI_ACCENT_COLOR = Color3.fromRGB(88, 101, 242) -- Accent color (Slider fill, Toast title)
+local UI_TOGGLE_ON = Color3.fromRGB(240, 71, 71)    -- Toggle ON color (Red square in your image)
+local UI_TOGGLE_OFF = Color3.fromRGB(67, 181, 129)   -- Toggle OFF color (Green, used when off)
 local UI_TEXT_COLOR = Color3.new(0.9, 0.9, 0.9)
 local FONT = Enum.Font.SourceSansBold
 local CORNER_RADIUS = 6
@@ -19,7 +20,7 @@ local function c(o, p)
     return o
 end
 
-function lib.makeText(parent, text, size, color, align)
+function lib.makeText(parent, text, size, color, align, textSize)
     local l = Instance.new("TextLabel")
     c(l, {
         Parent = parent,
@@ -27,7 +28,8 @@ function lib.makeText(parent, text, size, color, align)
         Size = UDim2.new(0, size.X, 0, size.Y),
         BackgroundTransparency = 1,
         TextColor3 = color or UI_TEXT_COLOR,
-        TextScaled = true,
+        TextScaled = textSize == nil, -- Only scale if textSize is not provided
+        TextSize = textSize or 14,    -- Default text size if not scaled
         Font = FONT,
         TextXAlignment = align or Enum.TextXAlignment.Center,
         TextYAlignment = Enum.TextYAlignment.Center
@@ -44,6 +46,7 @@ function lib.makeRect(parent, size, bg, stroke, corner)
     s.Color = stroke or Color3.fromRGB(25, 29, 32)
     s.Parent = f
 
+    -- Ensure UICorner is created if corner is provided
     if corner and corner > 0 then
         local u = Instance.new("UICorner")
         u.CornerRadius = UDim.new(0, corner)
@@ -61,7 +64,8 @@ function lib.Init(title, corner)
     local mainFrame = lib.makeRect(gui, Vector2.new(500, 400), UI_BG_COLOR, nil, corner or CORNER_RADIUS * 2)
     mainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
 
-    local header = lib.makeText(mainFrame, title or "Window", Vector2.new(500, 40), UI_TEXT_COLOR, Enum.TextXAlignment.Center)
+    -- HEADER: Smaller text size applied here
+    local header = lib.makeText(mainFrame, title or "Window", Vector2.new(500, 40), UI_TEXT_COLOR, Enum.TextXAlignment.Center, 24) -- Set TextSize to 24 (instead of scaled)
     header.Size = UDim2.new(1, 0, 0, 40)
     header.Position = UDim2.new(0, 0, 0, 0)
     header.TextWrapped = true
@@ -184,17 +188,15 @@ function lib.Init(title, corner)
         toast.Size = UDim2.new(0, 300, 0, 70)
         toast.BackgroundTransparency = 1
 
-        local titleLabel = lib.makeText(toast, title, Vector2.new(280, 20), UI_ACCENT_COLOR, Enum.TextXAlignment.Left)
+        local titleLabel = lib.makeText(toast, title, Vector2.new(280, 20), UI_ACCENT_COLOR, Enum.TextXAlignment.Left, 16)
         titleLabel.Size = UDim2.new(1, -20, 0, 20)
         titleLabel.Position = UDim2.new(0, 10, 0, 5)
         titleLabel.Font = FONT
         titleLabel.TextTransparency = 1
 
-        local descLabel = lib.makeText(toast, description, Vector2.new(280, 40), UI_TEXT_COLOR, Enum.TextXAlignment.Left)
+        local descLabel = lib.makeText(toast, description, Vector2.new(280, 40), UI_TEXT_COLOR, Enum.TextXAlignment.Left, 14)
         descLabel.Size = UDim2.new(1, -20, 0, 30)
         descLabel.Position = UDim2.new(0, 10, 0, 25)
-        descLabel.TextScaled = false
-        descLabel.TextSize = 14
         descLabel.TextTransparency = 1
 
         local barFrame = lib.makeRect(toast, Vector2.new(280, 3), UI_SECTION_COLOR, nil, 1)
@@ -280,14 +282,11 @@ function lib.Init(title, corner)
         local section = lib.makeRect(tab.frame, Vector2.new(0, 0), UI_SECTION_COLOR, nil, CORNER_RADIUS)
         section.Size = UDim2.new(1, 0, 0, 0) 
 
-        local title = lib.makeText(section, sectionName, Vector2.new(0, 25), UI_TEXT_COLOR, Enum.TextXAlignment.Left)
+        local title = lib.makeText(section, sectionName, Vector2.new(0, 25), UI_TEXT_COLOR, Enum.TextXAlignment.Left, 16)
         title.Size = UDim2.new(1, -20, 0, 25)
         title.Position = UDim2.new(0, 10, 0, 0)
-        title.TextScaled = false
-        title.TextSize = 16
 
         local secContent = Instance.new("Frame")
-        -- Corrected Size: takes 100% width, height is controlled by list layout
         c(secContent, {Parent = section, Size = UDim2.new(1, -20, 1, -35), Position = UDim2.new(0, 10, 0, 30), BackgroundTransparency = 1})
 
         local layout = Instance.new("UIListLayout")
@@ -296,7 +295,6 @@ function lib.Init(title, corner)
         layout.Parent = secContent
 
         layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            -- Set the section height based on its content plus header height and padding
             section.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y + 40)
         end)
 
@@ -306,25 +304,23 @@ function lib.Init(title, corner)
     end
 
     local function addLabel(section, text)
-        local l = lib.makeText(section.content, text, Vector2.new(0, 25), UI_TEXT_COLOR, Enum.TextXAlignment.Left)
+        local l = lib.makeText(section.content, text, Vector2.new(0, 25), UI_TEXT_COLOR, Enum.TextXAlignment.Left, 14)
         l.Size = UDim2.new(1, 0, 0, 25)
-        l.TextScaled = false
-        l.TextSize = 14
         return l
     end
 
     local function addSeparator(section)
-        local s = lib.makeRect(section.content, Vector2.new(0, 2), UI_SECTION_COLOR, nil, 0)
+        local s = lib.makeRect(section.content, Vector2.new(0, 2), UI_ELEMENT_COLOR, nil, 0) -- Use UI_ELEMENT_COLOR for a lighter line
         s.Size = UDim2.new(1, 0, 0, 2)
         return s
     end
 
     local function addButton(section, text, callback, keybind)
-        -- Uses UDim2.new(1, 0, 0, 35) to fill the width of the secContent container
+        -- Explicitly using CORNER_RADIUS and UI_ELEMENT_COLOR
         local b = lib.makeRect(section.content, Vector2.new(0, 35), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
         b.Size = UDim2.new(1, 0, 0, 35)
 
-        local btnText = lib.makeText(b, text, Vector2.new(0, 35), UI_TEXT_COLOR, Enum.TextXAlignment.Center)
+        local btnText = lib.makeText(b, text, Vector2.new(0, 35), UI_TEXT_COLOR, Enum.TextXAlignment.Center, 16)
         btnText.Size = UDim2.new(1, 0, 1, 0)
 
         b.InputBegan:Connect(function(input)
@@ -338,16 +334,15 @@ function lib.Init(title, corner)
     end
 
     local function addToggle(section, text, default, callback, keybind, mode)
-        -- Uses UDim2.new(1, 0, 0, 35) to fill the width of the secContent container
+        -- Explicitly using CORNER_RADIUS and UI_ELEMENT_COLOR
         local f = lib.makeRect(section.content, Vector2.new(0, 35), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
         f.Size = UDim2.new(1, 0, 0, 35)
 
-        local lbl = lib.makeText(f, text, Vector2.new(0, 35), UI_TEXT_COLOR, Enum.TextXAlignment.Left)
+        local lbl = lib.makeText(f, text, Vector2.new(0, 35), UI_TEXT_COLOR, Enum.TextXAlignment.Left, 14)
         lbl.Size = UDim2.new(0.7, 0, 1, 0)
         lbl.Position = UDim2.new(0, 10, 0, 0)
-        lbl.TextScaled = false
-        lbl.TextSize = 14
 
+        -- The smaller toggle box inside the element frame
         local box = lib.makeRect(f, Vector2.new(20, 20), default and UI_TOGGLE_ON or UI_TOGGLE_OFF, Color3.fromRGB(30,30,30), 4)
         box.Position = UDim2.new(1, -30, 0.5, -10)
         
@@ -355,6 +350,7 @@ function lib.Init(title, corner)
 
         local function toggleState()
             toggled = not toggled
+            -- Switched ON/OFF colors to match the image (Red = ON, Green = OFF)
             box.BackgroundColor3 = toggled and UI_TOGGLE_ON or UI_TOGGLE_OFF
             if callback then callback(toggled) end
         end
@@ -405,17 +401,15 @@ function lib.Init(title, corner)
 
     local function addSlider(section, text, min, max, default, callback)
         local frameHeight = 45
-        -- Uses UDim2.new(1, 0, 0, 45) to fill the width of the secContent container
+        -- Explicitly using CORNER_RADIUS and UI_ELEMENT_COLOR
         local f = lib.makeRect(section.content, Vector2.new(0, frameHeight), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
         f.Size = UDim2.new(1, 0, 0, frameHeight)
 
         local currentValue = default
         
-        local label = lib.makeText(f, text .. ": " .. string.format("%.1f", currentValue), Vector2.new(0, 20), UI_TEXT_COLOR, Enum.TextXAlignment.Left)
+        local label = lib.makeText(f, text .. ": " .. string.format("%.1f", currentValue), Vector2.new(0, 20), UI_TEXT_COLOR, Enum.TextXAlignment.Left, 14)
         label.Size = UDim2.new(1, -10, 0, 18)
         label.Position = UDim2.new(0, 10, 0, 3)
-        label.TextScaled = false
-        label.TextSize = 14
 
         local sliderBar = lib.makeRect(f, Vector2.new(0, 6), UI_SECTION_COLOR, nil, 3)
         sliderBar.Size = UDim2.new(1, -20, 0, 6)
