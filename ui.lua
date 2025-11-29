@@ -1,216 +1,530 @@
 --[[
     UI Library ModuleScript (UILibrary)
 
-    This module provides a simple API for initializing a styled window and
-    creating standard components (Button, Label, TextBox) that conform to the
-    library's style.
+    This module provides an object-oriented API for building complex UIs with
+    cascading structure: Window -> Tab -> Section -> Component.
 ]]
 
 local ui = {}
 local Players = game:GetService("Players")
 
--- Configuration constants for styling
-local UI_CONFIG = {
-    Size = UDim2.new(0.3, 0, 0.5, 0), -- 30% width, 50% height
-    AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.new(0.5, 0, 0.5, 0), -- Centered
-    BackgroundColor = Color3.fromRGB(40, 44, 52), -- Dark grey
-    BorderColor = Color3.fromRGB(24, 25, 29),
-    BorderSizePixel = 2,
-    CornerRadius = UDim.new(0, 8),
-    HeaderHeight = UDim2.new(0, 30),
-    TitleTextColor = Color3.fromRGB(255, 255, 255),
-    TitleTextSize = 18,
+-- Configuration constants
+local C = {
+    -- Colors
+    PRIMARY_BG = Color3.fromRGB(40, 44, 52),
+    SECONDARY_BG = Color3.fromRGB(48, 52, 60), -- Tab/Section background
+    HEADER_BG = Color3.fromRGB(24, 25, 29),
+    ACCENT = Color3.fromRGB(85, 170, 255),
+    TEXT_COLOR = Color3.fromRGB(255, 255, 255),
 
-    -- Component Styles
-    ButtonColor = Color3.fromRGB(85, 170, 255), -- Bright blue
-    ComponentHeight = 35, -- Standard height for interactive elements
-    CornerRadiusSmall = UDim.new(0, 6),
-    PrimaryText = Color3.fromRGB(255, 255, 255),
+    -- Sizes & Spacing
+    WINDOW_SIZE = UDim2.new(0.3, 0, 0.5, 0),
+    HEADER_HEIGHT = 30,
+    PADDING_SIZE = 8,
+    COMPONENT_HEIGHT = 30,
+    CORNER_RADIUS = UDim.new(0, 8),
+    SMALL_CORNER_RADIUS = UDim.new(0, 5),
 }
 
---- Initializes the main UI window.
--- @param title string: The title to display on the window header.
--- @return Instance: The main content Frame of the UI.
-function ui.Init(title: string)
-    local LocalPlayer = Players.LocalPlayer
-    if not LocalPlayer then
-        warn("UILibrary.Init() called without a LocalPlayer. UI can only be initialized on the client.")
-        return nil
+-- Private Helper Functions (Instance Creation)
+local function createInstance(className, properties)
+    local inst = Instance.new(className)
+    for k, v in pairs(properties) do
+        inst[k] = v
+    end
+    return inst
+end
+
+local function applyCorners(instance, radius)
+    local corner = createInstance("UICorner", {
+        CornerRadius = radius or C.SMALL_CORNER_RADIUS,
+        Parent = instance,
+    })
+    return corner
+end
+
+local function setupDraggable(frame, dragHandle)
+    local dragging = false
+    local dragStartPos = Vector2.new(0, 0)
+    local frameStartPos = UDim2.new(0, 0, 0, 0)
+
+    dragHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStartPos = input.Position
+            frameStartPos = frame.Position
+        end
+    end)
+
+    dragHandle.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStartPos
+            local parentSize = frame.Parent.AbsoluteSize
+            local newX = frameStartPos.X.Scale + delta.X / parentSize.X
+            local newY = frameStartPos.Y.Scale + delta.Y / parentSize.Y
+            frame.Position = UDim2.new(newX, 0, newY, 0)
+        end
+    end)
+end
+
+-- ====================================================================
+-- Component Metatables (Base Components)
+-- ====================================================================
+
+ui.Component = {}
+
+-- [[ Label Component ]] ----------------------------------------------
+ui.Component.Label = { __index = ui.Component.Label }
+
+function ui.Component.Label:edit(new_text: string)
+    self.Instance.Text = new_text
+end
+
+function ui.Component.Label.new(parent, content: string)
+    local self = setmetatable({
+        Instance = createInstance("TextLabel", {
+            Name = "Label",
+            Size = UDim2.new(1, 0, 0, 20),
+            BackgroundTransparency = 1,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Text = content,
+            Font = Enum.Font.SourceSans,
+            TextColor3 = C.TEXT_COLOR,
+            TextSize = 16,
+            Parent = parent,
+        }),
+    }, ui.Component.Label)
+    return self
+end
+
+-- [[ Button Component ]] ---------------------------------------------
+ui.Component.Button = { __index = ui.Component.Button }
+
+function ui.Component.Button.new(parent, name: string, callback: function)
+    local Button = createInstance("TextButton", {
+        Name = name .. "Button",
+        Text = name,
+        Size = UDim2.new(1, 0, 0, C.COMPONENT_HEIGHT),
+        BackgroundColor3 = C.ACCENT,
+        Font = Enum.Font.SourceSansBold,
+        TextColor3 = C.TEXT_COLOR,
+        TextSize = 18,
+        Parent = parent,
+    })
+    applyCorners(Button, C.SMALL_CORNER_RADIUS)
+
+    Button.MouseButton1Click:Connect(callback)
+
+    local self = setmetatable({
+        Instance = Button,
+    }, ui.Component.Button)
+    return self
+end
+
+-- [[ Toggle Component ]] ---------------------------------------------
+ui.Component.Toggle = { __index = ui.Component.Toggle }
+
+function ui.Component.Toggle.new(parent, name: string, callback: function)
+    local Frame = createInstance("Frame", {
+        Name = name .. "ToggleContainer",
+        Size = UDim2.new(1, 0, 0, C.COMPONENT_HEIGHT),
+        BackgroundTransparency = 1,
+        Parent = parent,
+    })
+
+    -- Layout the components inside the frame
+    local ListLayout = createInstance("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        Padding = UDim.new(0, C.PADDING_SIZE),
+        Parent = Frame,
+    })
+
+    -- Label
+    local Label = createInstance("TextLabel", {
+        Name = "Label",
+        Text = name,
+        Size = UDim2.new(1, -30, 1, 0), -- Takes remaining space
+        BackgroundTransparency = 1,
+        Font = Enum.Font.SourceSans,
+        TextColor3 = C.TEXT_COLOR,
+        TextSize = 16,
+        Parent = Frame,
+    })
+
+    -- Toggle Button
+    local IsOn = false
+    local ToggleButton = createInstance("TextButton", {
+        Name = "Toggle",
+        Text = "OFF",
+        Size = UDim2.new(0, 45, 1, 0),
+        BackgroundColor3 = Color3.fromRGB(150, 40, 40), -- Default RED (Off)
+        Font = Enum.Font.SourceSansBold,
+        TextColor3 = C.TEXT_COLOR,
+        TextSize = 16,
+        Parent = Frame,
+    })
+    applyCorners(ToggleButton, C.SMALL_CORNER_RADIUS)
+
+    local function updateState()
+        IsOn = not IsOn
+        if IsOn then
+            ToggleButton.Text = "ON"
+            ToggleButton.BackgroundColor3 = C.ACCENT
+        else
+            ToggleButton.Text = "OFF"
+            ToggleButton.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+        end
+        callback(IsOn)
     end
 
+    ToggleButton.MouseButton1Click:Connect(updateState)
+
+    local self = setmetatable({
+        Instance = Frame,
+        Toggle = ToggleButton,
+        IsOn = IsOn,
+        -- Expose a way to manually change the state if needed
+        toggle = updateState,
+    }, ui.Component.Toggle)
+    return self
+end
+
+-- [[ Slider Component ]] ---------------------------------------------
+ui.Component.Slider = { __index = ui.Component.Slider }
+
+function ui.Component.Slider.new(parent, name: string, min: number, max: number, precision: number, callback: function)
+    local Container = createInstance("Frame", {
+        Name = name .. "SliderContainer",
+        Size = UDim2.new(1, 0, 0, C.COMPONENT_HEIGHT + 20), -- More height for label and slider
+        BackgroundTransparency = 1,
+        Parent = parent,
+    })
+
+    local TitleLabel = ui.Component.Label.new(Container, name)
+    TitleLabel.Instance.Size = UDim2.new(1, 0, 0, 20)
+    TitleLabel.Instance.TextYAlignment = Enum.TextYAlignment.Top
+
+    -- Value Display Label (updates with slider)
+    local ValueLabel = ui.Component.Label.new(Container, string.format("%." .. precision .. "f", min))
+    ValueLabel.Instance.TextXAlignment = Enum.TextXAlignment.Right
+    ValueLabel.Instance.Size = UDim2.new(1, 0, 0, 20)
+    ValueLabel.Instance.Position = UDim2.new(0, 0, 0, 0)
+    
+    -- Slider Bar (Frame)
+    local SliderBar = createInstance("Frame", {
+        Name = "Bar",
+        Size = UDim2.new(1, 0, 0, 10),
+        Position = UDim2.new(0, 0, 0, 20),
+        BackgroundColor3 = C.SECONDARY_BG,
+        Parent = Container,
+    })
+    applyCorners(SliderBar)
+
+    -- Slider Thumb (Button)
+    local Thumb = createInstance("TextButton", {
+        Name = "Thumb",
+        Text = "",
+        Size = UDim2.new(0, 15, 1.5, 0),
+        Position = UDim2.new(0, 0, -0.25, 0), -- Slightly overlap top/bottom
+        BackgroundColor3 = C.ACCENT,
+        Parent = SliderBar,
+    })
+    applyCorners(Thumb)
+
+    local IsDragging = false
+    local currentNormalizedValue = 0
+
+    local function updateValue(normalized)
+        -- Clamp between 0 and 1
+        normalized = math.max(0, math.min(1, normalized))
+
+        -- Calculate actual value
+        local value = min + normalized * (max - min)
+        local formattedValue = string.format("%." .. precision .. "f", value)
+        
+        -- Update UI
+        Thumb.Position = UDim2.new(normalized, 0, -0.25, 0)
+        ValueLabel.Instance.Text = formattedValue
+        currentNormalizedValue = normalized
+
+        -- Execute callback
+        callback(value)
+    end
+    
+    -- Initialize
+    updateValue(0)
+
+    -- Draggable Logic
+    Thumb.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            IsDragging = true
+        end
+    end)
+    
+    Thumb.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            IsDragging = false
+        end
+    end)
+
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if IsDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local localPos = SliderBar:WorldToScreenPoint(input.Position)
+            local sliderX = SliderBar.AbsolutePosition.X
+            local sliderWidth = SliderBar.AbsoluteSize.X
+            
+            local mouseX = input.Position.X
+            local normalizedX = (mouseX - sliderX) / sliderWidth
+            
+            updateValue(normalizedX)
+        end
+    end)
+
+    local self = setmetatable({
+        Instance = Container,
+        ValueLabel = ValueLabel.Instance,
+        SliderBar = SliderBar,
+        Thumb = Thumb,
+        min = min,
+        max = max,
+        precision = precision,
+    }, ui.Component.Slider)
+    return self
+end
+
+-- ====================================================================
+-- Structural Metatables
+-- ====================================================================
+
+-- [[ Section Metatable ]] --------------------------------------------
+ui.Section = { __index = ui.Section }
+
+function ui.Section:createSlider(name: string, min: number, max: number, precision: number, callback: function)
+    return ui.Component.Slider.new(self.Instance, name, min, max, precision, callback)
+end
+
+function ui.Section:createToggle(name: string, callback: function)
+    return ui.Component.Toggle.new(self.Instance, name, callback)
+end
+
+function ui.Section:createButton(name: string, callback: function)
+    return ui.Component.Button.new(self.Instance, name, callback)
+end
+
+function ui.Section:createLabel(content: string)
+    return ui.Component.Label.new(self.Instance, content)
+end
+
+function ui.Section.new(parent, name: string)
+    local Frame = createInstance("Frame", {
+        Name = name .. "Section",
+        Size = UDim2.new(1, 0, 0, 0), -- Auto size Y, full width
+        BackgroundColor3 = C.SECONDARY_BG,
+        BorderSizePixel = 0,
+        Parent = parent,
+    })
+    applyCorners(Frame)
+
+    createInstance("UIPadding", {
+        PaddingTop = UDim.new(0, C.PADDING_SIZE),
+        PaddingBottom = UDim.new(0, C.PADDING_SIZE),
+        PaddingLeft = UDim.new(0, C.PADDING_SIZE),
+        PaddingRight = UDim.new(0, C.PADDING_SIZE),
+        Parent = Frame,
+    })
+
+    createInstance("UIListLayout", {
+        Name = "SectionLayout",
+        Padding = UDim.new(0, C.PADDING_SIZE),
+        HorizontalAlignment = Enum.HorizontalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = Frame,
+    })
+
+    createInstance("UISizeConstraint", {
+        MinSize = Vector2.new(100, 50),
+        Parent = Frame
+    })
+
+    local self = setmetatable({
+        Name = name,
+        Instance = Frame,
+    }, ui.Section)
+    return self
+end
+
+-- [[ Tab Metatable ]] ------------------------------------------------
+ui.Tab = { __index = ui.Tab }
+
+function ui.Tab:createSection(name: string)
+    return ui.Section.new(self.Instance, name or "Section")
+end
+
+function ui.Tab.new(parent, name: string)
+    local Frame = createInstance("Frame", {
+        Name = name .. "Tab",
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Visible = false, -- Default hidden
+        Parent = parent,
+    })
+
+    -- Setup layout for sections
+    createInstance("UIListLayout", {
+        Name = "TabLayout",
+        Padding = UDim.new(0, C.PADDING_SIZE),
+        HorizontalAlignment = Enum.HorizontalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = Frame,
+    })
+
+    local self = setmetatable({
+        Name = name,
+        Instance = Frame,
+    }, ui.Tab)
+    return self
+end
+
+-- [[ Window Metatable ]] ---------------------------------------------
+ui.Window = { __index = ui.Window }
+
+function ui.Window:createTab(name: string)
+    -- Create button for the tab bar
+    local TabButton = createInstance("TextButton", {
+        Name = name .. "TabButton",
+        Text = name,
+        Size = UDim2.new(0, 100, 1, 0),
+        BackgroundColor3 = C.SECONDARY_BG,
+        Font = Enum.Font.SourceSansBold,
+        TextColor3 = C.TEXT_COLOR,
+        TextSize = 16,
+        Parent = self.TabContainer,
+    })
+    applyCorners(TabButton, C.SMALL_CORNER_RADIUS)
+
+    -- Create the actual tab content frame
+    local NewTab = ui.Tab.new(self.ContentArea, name)
+    self.Tabs[name] = NewTab
+
+    -- Tab switching logic
+    local function activateTab()
+        -- Deactivate all other tabs
+        for _, tab in pairs(self.Tabs) do
+            tab.Instance.Visible = false
+        end
+
+        -- Activate the new tab
+        NewTab.Instance.Visible = true
+        self.CurrentTab = name
+        
+        -- Update button colors
+        for tabName, tab in pairs(self.Tabs) do
+            local button = self.TabContainer:FindFirstChild(tabName .. "TabButton")
+            if button then
+                button.BackgroundColor3 = (tabName == name) and C.ACCENT or C.SECONDARY_BG
+            end
+        end
+    end
+
+    TabButton.MouseButton1Click:Connect(activateTab)
+
+    -- If this is the first tab, activate it
+    if #self.Tabs == 1 then
+        activateTab()
+    end
+
+    return NewTab
+end
+
+function ui.Window.new(title: string)
+    local LocalPlayer = Players.LocalPlayer
+    if not LocalPlayer then return nil end
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-    -- 1. Create the ScreenGui
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = title:gsub("%s+", "") .. "Screen" -- Simple name sanitization
-    ScreenGui.IgnoreGuiInset = true
-    ScreenGui.Parent = PlayerGui
+    -- 1. ScreenGui
+    local ScreenGui = createInstance("ScreenGui", { Name = title:gsub("%s+", "") .. "Screen", IgnoreGuiInset = true, Parent = PlayerGui })
 
-    -- 2. Create the main window Frame (Container)
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Name = "MainWindow"
-    MainFrame.Size = UI_CONFIG.Size
-    MainFrame.AnchorPoint = UI_CONFIG.AnchorPoint
-    MainFrame.Position = UI_CONFIG.Position
-    MainFrame.BackgroundColor3 = UI_CONFIG.BackgroundColor
-    MainFrame.BorderSizePixel = UI_CONFIG.BorderSizePixel
-    MainFrame.BorderColor3 = UI_CONFIG.BorderColor
-    MainFrame.Parent = ScreenGui
-
-    -- Add rounded corners to the main frame
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UI_CONFIG.CornerRadius
-    UICorner.Parent = MainFrame
-
-    -- 3. Create the Header Frame
-    local Header = Instance.new("Frame")
-    Header.Name = "Header"
-    Header.Size = UDim2.new(1, 0, 0, 30)
-    Header.Position = UDim2.new(0, 0, 0, 0)
-    Header.BackgroundColor3 = UI_CONFIG.BorderColor
-    Header.BorderSizePixel = 0
-    Header.Parent = MainFrame
-
-    -- Add rounded corners to the top of the header only
-    local UICornerHeader = Instance.new("UICorner")
-    UICornerHeader.CornerRadius = UI_CONFIG.CornerRadius
-    UICornerHeader.Parent = Header
-
-    -- 4. Create the Title Label
-    local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Name = "Title"
-    TitleLabel.Size = UDim2.new(1, 0, 1, 0)
-    TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Font = Enum.Font.SourceSansBold
-    TitleLabel.Text = title
-    TitleLabel.TextColor3 = UI_CONFIG.TitleTextColor
-    TitleLabel.TextSize = UI_CONFIG.TitleTextSize
-    TitleLabel.Parent = Header
-
-    -- 5. Create a content area
-    local ContentFrame = Instance.new("Frame")
-    ContentFrame.Name = "Content"
-    ContentFrame.Size = UDim2.new(1, 0, 1, -30)
-    ContentFrame.Position = UDim2.new(0, 0, 0, 30)
-    ContentFrame.BackgroundTransparency = 1
-    ContentFrame.BorderSizePixel = 0
-    ContentFrame.Parent = MainFrame
-
-    -- Add layout and padding for content management
-    local UIPadding = Instance.new("UIPadding")
-    UIPadding.PaddingTop = UDim.new(0, 10)
-    UIPadding.PaddingBottom = UDim.new(0, 10)
-    UIPadding.PaddingLeft = UDim.new(0, 10)
-    UIPadding.PaddingRight = UDim.new(0, 10)
-    UIPadding.Parent = ContentFrame
-
-    local UIListLayout = Instance.new("UIListLayout")
-    UIListLayout.Name = "Layout"
-    UIListLayout.Padding = UDim.new(0, 8)
-    UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    UIListLayout.Parent = ContentFrame
-
-    -- Optional: Add basic dragging functionality to the Header
-    local function setupDraggable(element, dragHandle)
-        local dragging = false
-        local dragStartPos = Vector2.new(0, 0)
-        local frameStartPos = UDim2.new(0, 0, 0, 0)
-
-        dragHandle.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                dragStartPos = input.Position
-                frameStartPos = element.Position
-                input.Handled = true
-            end
-        end)
-
-        dragHandle.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
-            end
-        end)
-
-        game:GetService("UserInputService").InputChanged:Connect(function(input)
-            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                local delta = input.Position - dragStartPos
-                local newX = frameStartPos.X.Scale + delta.X / element.Parent.AbsoluteSize.X
-                local newY = frameStartPos.Y.Scale + delta.Y / element.Parent.AbsoluteSize.Y
-                element.Position = UDim2.new(newX, 0, newY, 0)
-            end
-        end)
-    end
-
+    -- 2. MainFrame (Window Container)
+    local MainFrame = createInstance("Frame", {
+        Name = "MainWindow",
+        Size = C.WINDOW_SIZE,
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        BackgroundColor3 = C.PRIMARY_BG,
+        BorderSizePixel = 2,
+        BorderColor3 = C.HEADER_BG,
+        Parent = ScreenGui,
+    })
+    applyCorners(MainFrame, C.CORNER_RADIUS)
+    
+    -- 3. Header Frame
+    local Header = createInstance("Frame", {
+        Name = "Header",
+        Size = UDim2.new(1, 0, 0, C.HEADER_HEIGHT),
+        BackgroundColor3 = C.HEADER_BG,
+        BorderSizePixel = 0,
+        Parent = MainFrame,
+    })
+    createInstance("TextLabel", {
+        Name = "Title",
+        Text = title,
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.SourceSansBold,
+        TextColor3 = C.TEXT_COLOR,
+        TextSize = 18,
+        Parent = Header,
+    })
     setupDraggable(MainFrame, Header)
 
-    return ContentFrame
+    -- 4. Tab Container (for buttons)
+    local TabContainer = createInstance("Frame", {
+        Name = "TabButtons",
+        Size = UDim2.new(1, 0, 0, C.COMPONENT_HEIGHT),
+        Position = UDim2.new(0, 0, 0, C.HEADER_HEIGHT),
+        BackgroundTransparency = 1,
+        Parent = MainFrame,
+    })
+    createInstance("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        Padding = UDim.new(0, C.PADDING_SIZE),
+        Parent = TabContainer,
+    })
+
+    -- 5. Content Area (for tab content)
+    local ContentArea = createInstance("Frame", {
+        Name = "TabContent",
+        Size = UDim2.new(1, 0, 1, -(C.HEADER_HEIGHT + C.COMPONENT_HEIGHT + C.PADDING_SIZE)), -- Header + TabBar height
+        Position = UDim2.new(0, 0, 0, C.HEADER_HEIGHT + C.COMPONENT_HEIGHT + C.PADDING_SIZE),
+        BackgroundTransparency = 1,
+        Parent = MainFrame,
+    })
+    
+    local self = setmetatable({
+        Instance = MainFrame,
+        ScreenGui = ScreenGui,
+        Header = Header,
+        TabContainer = TabContainer,
+        ContentArea = ContentArea,
+        Tabs = {},
+        CurrentTab = nil,
+    }, ui.Window)
+    return self
 end
 
---- Creates a styled TextButton.
--- @param parent Instance: The container to place the button in (e.g., the ContentFrame).
--- @param text string: The text to display on the button.
--- @return Instance: The created TextButton.
-function ui.CreateButton(parent, text)
-    local Button = Instance.new("TextButton")
-    Button.Name = text:gsub("%s+", "") .. "Button"
-    Button.Size = UDim2.new(1, 0, 0, UI_CONFIG.ComponentHeight) -- Full width, fixed height
-    Button.BackgroundColor3 = UI_CONFIG.ButtonColor
-    Button.Text = text
-    Button.Font = Enum.Font.SourceSansBold
-    Button.TextColor3 = UI_CONFIG.PrimaryText
-    Button.TextSize = 18
+-- ====================================================================
+-- Public API
+-- ====================================================================
 
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UI_CONFIG.CornerRadiusSmall
-    Corner.Parent = Button
-
-    Button.Parent = parent
-    return Button
-end
-
---- Creates a styled TextLabel.
--- @param parent Instance: The container to place the label in.
--- @param text string: The text content of the label.
--- @return Instance: The created TextLabel.
-function ui.CreateLabel(parent, text)
-    local Label = Instance.new("TextLabel")
-    Label.Name = "Label"
-    Label.Size = UDim2.new(1, 0, 0, 20)
-    Label.BackgroundTransparency = 1
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.Text = text
-    Label.Font = Enum.Font.SourceSans
-    Label.TextColor3 = UI_CONFIG.PrimaryText
-    Label.TextSize = 16
-
-    Label.Parent = parent
-    return Label
-end
-
---- Creates a styled TextBox.
--- @param parent Instance: The container to place the textbox in.
--- @param placeholder string: The text shown when the box is empty.
--- @return Instance: The created TextBox.
-function ui.CreateTextBox(parent, placeholder)
-    local TextBox = Instance.new("TextBox")
-    TextBox.Name = "TextBox"
-    TextBox.Size = UDim2.new(1, 0, 0, UI_CONFIG.ComponentHeight)
-    TextBox.BackgroundColor3 = Color3.fromRGB(56, 60, 68) -- Slightly lighter dark color
-    TextBox.Text = ""
-    TextBox.PlaceholderText = placeholder
-    TextBox.Font = Enum.Font.SourceSans
-    TextBox.TextColor3 = UI_CONFIG.PrimaryText
-    TextBox.TextSize = 16
-    TextBox.ClearTextOnFocus = false
-
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UI_CONFIG.CornerRadiusSmall
-    Corner.Parent = TextBox
-
-    TextBox.Parent = parent
-    return TextBox
+function ui:Init(title: string)
+    return ui.Window.new(title)
 end
 
 return ui
