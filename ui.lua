@@ -183,8 +183,7 @@ function lib.Init(title, corner)
         end
     end)
 
-    -- NEW FIX: Listen for InputEnded globally (safer) to check for click outside dropdown area.
-    -- This relies on the core InputObject working, but avoids InputObject.Target.
+    -- FIX: Use InputEnded to check for click outside dropdown area using position, avoiding InputObject.Target error.
     UserInputService.InputEnded:Connect(function(input)
         if visible and #openDropdowns > 0 and input.UserInputType == Enum.UserInputType.MouseButton1 then
             
@@ -195,7 +194,7 @@ function lib.Init(title, corner)
                 local listAbsPos = listFrame.AbsolutePosition
                 local listAbsSize = listFrame.AbsoluteSize
                 
-                -- Check if the click landed within the list frame boundaries
+                -- Check if the mouse position is inside the list frame boundaries
                 local inListX = mousePos.X >= listAbsPos.X and mousePos.X <= listAbsPos.X + listAbsSize.X
                 local inListY = mousePos.Y >= listAbsPos.Y and mousePos.Y <= listAbsPos.Y + listAbsSize.Y
                 
@@ -203,8 +202,11 @@ function lib.Init(title, corner)
                     clickedOutside = false
                     break
                 end
-                
-                -- We also need to check the button itself that opened it
+            end
+
+            -- Now check if the click was on a dropdown button itself, to prevent closing the dropdown 
+            -- if the user clicked it to open/close it in the first place.
+            if clickedOutside then
                 for button, _ in pairs(dropdownButtons) do
                     local btnAbsPos = button.AbsolutePosition
                     local btnAbsSize = button.AbsoluteSize
@@ -213,8 +215,7 @@ function lib.Init(title, corner)
                     local inButtonY = mousePos.Y >= btnAbsPos.Y and mousePos.Y <= btnAbsPos.Y + btnAbsSize.Y
                     
                     if inButtonX and inButtonY then
-                        -- If the user clicked the button, it either opens or closes the dropdown.
-                        -- We don't want to close all here, the button's internal logic handles it.
+                        -- If the user clicked the button, the button's internal logic handles it.
                         clickedOutside = false
                         break
                     end
@@ -560,7 +561,7 @@ function lib.Init(title, corner)
         local f = lib.makeRect(section.content, Vector2.new(0, frameHeight), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
         f.Size = UDim2.new(1, 0, 0, frameHeight)
         
-        -- Store button reference 
+        -- Store button reference for the global closing logic in lib.Init
         dropdownButtons[f] = true
 
         local currentOption = default
@@ -610,6 +611,7 @@ function lib.Init(title, corner)
         end
 
         local function openList()
+            -- Close others first using the safe method
             closeAllDropdowns() 
             local absPos = f.AbsolutePosition
             listFrame.Size = UDim2.new(0, f.AbsoluteSize.X, 0, math.min(#options * 25, 150))
@@ -620,6 +622,7 @@ function lib.Init(title, corner)
             table.insert(openDropdowns, listFrame)
         end
         
+        -- Safest click handler: Toggle state on click
         f.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 if listOpen then
