@@ -8,13 +8,8 @@ local UI_BG_COLOR = Color3.fromRGB(30, 33, 36)
 local UI_SECTION_BG_COLOR = Color3.fromRGB(40, 44, 47)
 local UI_ELEMENT_COLOR = Color3.fromRGB(50, 54, 57)
 local UI_ACCENT_COLOR = Color3.fromRGB(88, 101, 242)
-
--- FIX: Ensure Green is ON and Red is OFF, by assigning the colors correctly.
--- We are keeping the conventional variable names, but ensuring the associated
--- color constant matches the desired visual result.
-local UI_TOGGLE_ON = Color3.fromRGB(67, 181, 129) -- Green
-local UI_TOGGLE_OFF = Color3.fromRGB(240, 71, 71) -- Red
-
+local UI_TOGGLE_ON = Color3.fromRGB(67, 181, 129)
+local UI_TOGGLE_OFF = Color3.fromRGB(240, 71, 71)
 local UI_TEXT_COLOR = Color3.new(0.9, 0.9, 0.9)
 local FONT = Enum.Font.SourceSansBold
 local CORNER_RADIUS = 6
@@ -117,10 +112,10 @@ function lib.Init(title, corner)
 
     local function tweenChildrenTransparency(frame, targetTransparency, tweenInfo)
         for _, child in ipairs(frame:GetChildren()) do
-            if child:IsA("TextLabel") or child:IsA("TextButton") then
+            if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
                 TweenService:Create(child, tweenInfo, {TextTransparency = targetTransparency}):Play()
                 
-                if child:IsA("TextButton") then
+                if child:IsA("TextButton") or child:IsA("TextBox") then
                     TweenService:Create(child, tweenInfo, {BackgroundTransparency = targetTransparency}):Play()
                 end
                 
@@ -128,7 +123,10 @@ function lib.Init(title, corner)
                 TweenService:Create(child, tweenInfo, {Transparency = targetTransparency}):Play()
                 
             elseif child:IsA("Frame") or child:IsA("ScrollingFrame") then
-                tweenChildrenTransparency(child, targetTransparency, tweenInfo)
+                -- Check if it's the dropdown list, which should stay invisible
+                if child.Name ~= "DropdownList" then
+                     tweenChildrenTransparency(child, targetTransparency, tweenInfo)
+                end
             end
         end
     end
@@ -258,7 +256,7 @@ function lib.Init(title, corner)
         local layout = Instance.new("UIListLayout")
         c(layout, {
             Parent = tabFrame,
-            Padding = UDim.new(0, 6),
+            Padding = UDim.new(0, 6), -- Tighter padding
             SortOrder = Enum.SortOrder.LayoutOrder
         })
 
@@ -295,12 +293,12 @@ function lib.Init(title, corner)
         local layout = Instance.new("UIListLayout")
         c(layout, {
             Parent = secContent,
-            Padding = UDim.new(0, 8),
+            Padding = UDim.new(0, 6), -- Tighter padding
             SortOrder = Enum.SortOrder.LayoutOrder
         })
 
         layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            section.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y + 40)
+            section.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y + 35) -- Reduced height
         end)
 
         section.Parent = tab.frame
@@ -317,14 +315,18 @@ function lib.Init(title, corner)
     local function addSeparator(section)
         local s = lib.makeRect(section.content, Vector2.new(0, 2), UI_ELEMENT_COLOR, nil, 0)
         s.Size = UDim2.new(1, 0, 0, 2)
+        -- Add a tiny buffer above and below the separator
+        local spacer = lib.makeRect(section.content, Vector2.new(0, 4), Color3.new(1,1,1), nil, 0)
+        spacer.BackgroundTransparency = 1
+        s.Parent = section.content
         return s
     end
 
     local function addButton(section, text, callback, keybind)
-        local b = lib.makeRect(section.content, Vector2.new(0, 35), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
-        b.Size = UDim2.new(1, 0, 0, 35)
+        local b = lib.makeRect(section.content, Vector2.new(0, 30), UI_ELEMENT_COLOR, nil, CORNER_RADIUS) -- Smaller height
+        b.Size = UDim2.new(1, 0, 0, 30)
 
-        local btnText = lib.makeText(b, text, Vector2.new(0, 35), UI_TEXT_COLOR, Enum.TextXAlignment.Center, 16)
+        local btnText = lib.makeText(b, text, Vector2.new(0, 30), UI_TEXT_COLOR, Enum.TextXAlignment.Center, 14)
         btnText.Size = UDim2.new(1, 0, 1, 0)
 
         b.InputBegan:Connect(function(input)
@@ -338,15 +340,15 @@ function lib.Init(title, corner)
     end
 
     local function addToggle(section, text, default, callback, keybind, mode)
-        local f = lib.makeRect(section.content, Vector2.new(0, 35), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
-        f.Size = UDim2.new(1, 0, 0, 35)
+        local f = lib.makeRect(section.content, Vector2.new(0, 30), UI_ELEMENT_COLOR, nil, CORNER_RADIUS) -- Smaller height
+        f.Size = UDim2.new(1, 0, 0, 30)
 
-        local lbl = lib.makeText(f, text, Vector2.new(0, 35), UI_TEXT_COLOR, Enum.TextXAlignment.Left, 14)
+        local lbl = lib.makeText(f, text, Vector2.new(0, 30), UI_TEXT_COLOR, Enum.TextXAlignment.Left, 14)
         lbl.Size = UDim2.new(0.7, 0, 1, 0)
         lbl.Position = UDim2.new(0, 10, 0, 0)
 
-        local box = lib.makeRect(f, Vector2.new(20, 20), default and UI_TOGGLE_ON or UI_TOGGLE_OFF, Color3.fromRGB(30,30,30), 4)
-        box.Position = UDim2.new(1, -30, 0.5, -10)
+        local box = lib.makeRect(f, Vector2.new(18, 18), default and UI_TOGGLE_ON or UI_TOGGLE_OFF, Color3.fromRGB(30,30,30), 4) -- Smaller box
+        box.Position = UDim2.new(1, -28, 0.5, -9)
         
         local toggled = default
 
@@ -401,25 +403,25 @@ function lib.Init(title, corner)
     end
 
     local function addSlider(section, text, min, max, default, callback)
-        local frameHeight = 45
+        local frameHeight = 40 -- Smaller height
         local f = lib.makeRect(section.content, Vector2.new(0, frameHeight), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
         f.Size = UDim2.new(1, 0, 0, frameHeight)
 
         local currentValue = default
         
-        local label = lib.makeText(f, text .. ": " .. string.format("%.1f", currentValue), Vector2.new(0, 20), UI_TEXT_COLOR, Enum.TextXAlignment.Left, 14)
-        label.Size = UDim2.new(1, -10, 0, 18)
+        local label = lib.makeText(f, text .. ": " .. string.format("%.1f", currentValue), Vector2.new(0, 15), UI_TEXT_COLOR, Enum.TextXAlignment.Left, 14)
+        label.Size = UDim2.new(1, -10, 0, 15)
         label.Position = UDim2.new(0, 10, 0, 3)
 
-        local sliderBar = lib.makeRect(f, Vector2.new(0, 6), UI_SECTION_BG_COLOR, nil, 3)
-        sliderBar.Size = UDim2.new(1, -20, 0, 6)
-        sliderBar.Position = UDim2.new(0, 10, 0, 25)
+        local sliderBar = lib.makeRect(f, Vector2.new(0, 4), UI_SECTION_BG_COLOR, nil, 2) -- Thinner bar
+        sliderBar.Size = UDim2.new(1, -20, 0, 4)
+        sliderBar.Position = UDim2.new(0, 10, 0, 22)
         
-        local fill = lib.makeRect(sliderBar, Vector2.new(0, 6), UI_ACCENT_COLOR, nil, 3)
+        local fill = lib.makeRect(sliderBar, Vector2.new(0, 4), UI_ACCENT_COLOR, nil, 2)
         fill.Size = UDim2.new(0, 0, 1, 0)
         
-        local thumb = lib.makeRect(sliderBar, Vector2.new(14, 14), Color3.new(1, 1, 1), Color3.fromRGB(30,30,30), 7)
-        thumb.Position = UDim2.new(0, -7, 0.5, -7)
+        local thumb = lib.makeRect(sliderBar, Vector2.new(12, 12), Color3.new(1, 1, 1), Color3.fromRGB(30,30,30), 6) -- Smaller thumb
+        thumb.Position = UDim2.new(0, -6, 0.5, -6)
         
         local isDragging = false
 
@@ -439,7 +441,7 @@ function lib.Init(title, corner)
         local function updateUI(value, ratio)
             currentValue = value
             fill.Size = UDim2.new(ratio, 0, 1, 0)
-            thumb.Position = UDim2.new(ratio, -7, 0.5, -7)
+            thumb.Position = UDim2.new(ratio, -6, 0.5, -6)
             label.Text = text .. ": " .. string.format("%.1f", currentValue)
             if callback then callback(currentValue) end
         end
@@ -490,6 +492,149 @@ function lib.Init(title, corner)
         }
     end
 
+    local function addDropdown(section, text, options, default, callback)
+        local frameHeight = 30
+        local f = lib.makeRect(section.content, Vector2.new(0, frameHeight), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
+        f.Size = UDim2.new(1, 0, 0, frameHeight)
+
+        local currentOption = default
+        
+        local label = lib.makeText(f, text, Vector2.new(0, frameHeight), UI_TEXT_COLOR, Enum.TextXAlignment.Left, 14)
+        label.Size = UDim2.new(0.6, 0, 1, 0)
+        label.Position = UDim2.new(0, 10, 0, 0)
+        
+        local valueText = lib.makeText(f, currentOption, Vector2.new(0, frameHeight), UI_ACCENT_COLOR, Enum.TextXAlignment.Right, 14)
+        valueText.Size = UDim2.new(0.4, -20, 1, 0)
+        valueText.Position = UDim2.new(0.6, 10, 0, 0)
+
+        local listOpen = false
+        local listFrame = Instance.new("ScrollingFrame")
+        c(listFrame, {
+            Parent = gui, 
+            Name = "DropdownList",
+            Size = UDim2.new(0, f.AbsoluteSize.X, 0, math.min(#options * 25, 150)),
+            Position = UDim2.new(0, 0, 0, 0), -- Position is set dynamically
+            BackgroundColor3 = UI_ELEMENT_COLOR,
+            BackgroundTransparency = 0,
+            Visible = false,
+            BorderSizePixel = 0,
+            ZIndex = 2
+        })
+        Instance.new("UICorner", listFrame).CornerRadius = UDim.new(0, CORNER_RADIUS)
+        
+        local listLayout = Instance.new("UIListLayout")
+        c(listLayout, {
+            Parent = listFrame,
+            FillDirection = Enum.FillDirection.Vertical,
+            Padding = UDim.new(0, 0),
+            SortOrder = Enum.SortOrder.LayoutOrder
+        })
+        
+        local function closeList()
+            listFrame.Visible = false
+            listOpen = false
+        end
+
+        local function openList()
+            local absPos = f.AbsolutePosition
+            listFrame.Size = UDim2.new(0, f.AbsoluteSize.X, 0, math.min(#options * 25, 150))
+            listFrame.Position = UDim2.new(0, absPos.X, 0, absPos.Y + f.AbsoluteSize.Y)
+            listFrame.CanvasSize = UDim2.new(0, 0, 0, #options * 25)
+            listFrame.Visible = true
+            listOpen = true
+        end
+        
+        f.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                if listOpen then
+                    closeList()
+                else
+                    openList()
+                end
+            end
+        end)
+
+        UserInputService.InputBegan:Connect(function(input)
+            if listOpen and input.UserInputType == Enum.UserInputType.MouseButton1 and not input.Target:IsDescendantOf(listFrame) and not input.Target:IsDescendantOf(f) then
+                closeList()
+            end
+        end)
+        
+        for i, option in ipairs(options) do
+            local item = Instance.new("TextButton")
+            c(item, {
+                Parent = listFrame,
+                Text = option,
+                Size = UDim2.new(1, 0, 0, 25),
+                BackgroundColor3 = UI_ELEMENT_COLOR,
+                TextScaled = true,
+                Font = FONT,
+                TextColor3 = UI_TEXT_COLOR,
+                ZIndex = 2
+            })
+            
+            item.MouseButton1Click:Connect(function()
+                currentOption = option
+                valueText.Text = option
+                if callback then callback(option) end
+                closeList()
+            end)
+            
+            item.MouseEnter:Connect(function()
+                item.BackgroundColor3 = UI_SECTION_BG_COLOR
+            end)
+            item.MouseLeave:Connect(function()
+                item.BackgroundColor3 = UI_ELEMENT_COLOR
+            end)
+        end
+        
+        return {
+            frame = f,
+            getSelected = function() return currentOption end,
+            set = function(option) currentOption = option; valueText.Text = option end
+        }
+    end
+
+    local function addTextInput(section, text, default, callback)
+        local frameHeight = 30
+        local f = lib.makeRect(section.content, Vector2.new(0, frameHeight), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
+        f.Size = UDim2.new(1, 0, 0, frameHeight)
+
+        local label = lib.makeText(f, text, Vector2.new(0, frameHeight), UI_TEXT_COLOR, Enum.TextXAlignment.Left, 14)
+        label.Size = UDim2.new(0.3, 0, 1, 0)
+        label.Position = UDim2.new(0, 10, 0, 0)
+
+        local input = Instance.new("TextBox")
+        c(input, {
+            Parent = f,
+            Text = default,
+            Size = UDim2.new(0.65, -10, 0, 20),
+            Position = UDim2.new(0.3, 5, 0.5, -10),
+            BackgroundColor3 = UI_SECTION_BG_COLOR,
+            TextColor3 = UI_TEXT_COLOR,
+            Font = FONT,
+            TextSize = 14,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            PlaceholderText = "",
+            TextWrapped = true,
+            ClearTextOnFocus = false
+        })
+        Instance.new("UICorner", input).CornerRadius = UDim.new(0, 4)
+        
+        local currentText = default
+
+        input.FocusLost:Connect(function(enterPressed)
+            currentText = input.Text
+            if callback then callback(currentText) end
+        end)
+
+        return {
+            frame = f,
+            getText = function() return currentText end,
+            set = function(newText) currentText = newText; input.Text = newText end
+        }
+    end
+
     UserInputService.InputBegan:Connect(function(input, processed)
         if input.UserInputType.Name:find("Key") and not processed and keybinds[input.KeyCode] then 
             keybinds[input.KeyCode]("Begin") 
@@ -507,6 +652,8 @@ function lib.Init(title, corner)
         addLabel = addLabel, addSeparator = addSeparator,
         addButton = addButton, addToggle = addToggle,
         addSlider = addSlider,
+        addDropdown = addDropdown,
+        addTextInput = addTextInput,
         showToast = lib.showToast
     }
 end
