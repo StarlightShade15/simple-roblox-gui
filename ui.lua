@@ -325,6 +325,7 @@ function Window:createTab(name: string)
     local tabObject = Tab.new(self.Container, name)
     table.insert(self.Tabs, tabObject)
     
+    -- Create the tab button
     local button = Instance.new("TextButton")
     button.Name = name .. "TabButton"
     button.Text = name
@@ -337,23 +338,32 @@ function Window:createTab(name: string)
 
     local currentTab = tabObject
 
-    button.MouseButton1Click:Connect(function()
+    -- Define the logic for switching the tab
+    local function switchTab()
+        -- Hide all tab content
         for _, tab in ipairs(self.Tabs) do
             tab.Container.Visible = false
         end
+        -- Reset all tab buttons visually
         for _, btn in ipairs(self.TabBar:GetChildren()) do
             if btn:IsA("TextButton") then
                 btn.BackgroundColor3 = UI_CONFIG.TAB_BAR_COLOR
             end
         end
 
+        -- Show current tab content and update button visuals
         currentTab.Container.Visible = true
         button.BackgroundColor3 = UI_CONFIG.ACCENT_COLOR
-    end)
+    end
+
+    button.MouseButton1Click:Connect(switchTab)
     
+    -- Automatically switch to the first tab created
     if #self.Tabs == 1 then
-        button:GetPropertyChangedSignal("Parent"):Wait()
-        button.MouseButton1Click:Fire()
+        -- Use task.wait() for a reliable micro-yield to allow layout to process
+        -- before simulating the click logic directly.
+        task.wait() 
+        switchTab()
     end
 
     return tabObject
