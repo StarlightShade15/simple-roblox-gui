@@ -5,6 +5,16 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
+-- UI Constants
+local UI_BG_COLOR = Color3.fromRGB(30, 30, 30)
+local UI_ELEMENT_COLOR = Color3.fromRGB(50, 50, 50)
+local UI_SECTION_COLOR = Color3.fromRGB(40, 40, 40)
+local UI_ACCENT_COLOR = Color3.fromRGB(0, 150, 255) -- Standard blue for highlights
+local UI_TOGGLE_ON = Color3.fromRGB(0, 255, 0)
+local UI_TOGGLE_OFF = Color3.fromRGB(255, 0, 0)
+local UI_TEXT_COLOR = Color3.new(1, 1, 1)
+local FONT = Enum.Font.SourceSans
+
 -- Helper function to apply properties to an instance (shorthand)
 local function c(o, p)
     for k, v in pairs(p) do o[k] = v end
@@ -20,9 +30,9 @@ function lib.makeText(parent, text, size, color)
         Text = text,
         Size = UDim2.new(0, size.X, 0, size.Y),
         BackgroundTransparency = 1,
-        TextColor3 = color or Color3.new(1, 1, 1),
+        TextColor3 = color or UI_TEXT_COLOR,
         TextScaled = true,
-        Font = Enum.Font.SourceSans
+        Font = FONT
     })
     return l
 end
@@ -48,14 +58,14 @@ end
 
 function lib.Init(title, corner)
     local gui = Instance.new("ScreenGui")
-    gui.Name = title:gsub("%s+", "") .. "GUI" -- Ensure a valid name
-    gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui") -- Better parent than CoreGui
+    gui.Name = title:gsub("%s+", "") .. "GUI"
+    gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
     gui.ResetOnSpawn = false
 
-    local mainFrame = lib.makeRect(gui, Vector2.new(500, 400), Color3.fromRGB(30, 30, 30), nil, corner or 10)
+    local mainFrame = lib.makeRect(gui, Vector2.new(500, 400), UI_BG_COLOR, nil, corner or 10)
     mainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
 
-    local header = lib.makeText(mainFrame, title or "Window", Vector2.new(500, 40), Color3.new(1, 1, 1))
+    local header = lib.makeText(mainFrame, title or "Window", Vector2.new(500, 40), UI_TEXT_COLOR)
     header.Position = UDim2.new(0, 0, 0, 0)
     header.TextWrapped = true
 
@@ -65,7 +75,6 @@ function lib.Init(title, corner)
     local tabBar = Instance.new("Frame")
     c(tabBar, {Parent = content, Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1})
 
-    -- Add UIListLayout for Tab Button arrangement
     local tabLayout = Instance.new("UIListLayout")
     c(tabLayout, {
         Parent = tabBar,
@@ -76,51 +85,38 @@ function lib.Init(title, corner)
     })
 
     local tabContainer = Instance.new("Frame")
-    c(tabContainer, {Parent = content, Size = UDim2.new(1, 0, 1, -30), Position = UDim2.new(0, 0, 0, 30), BackgroundTransparency = 1})
+    c(tabContainer, {Parent = content, Size = UDim2.new(1, 0, 1, 0), Position = UDim2.new(0, 0, 0, 30), BackgroundTransparency = 1})
 
     local tabs = {}
     local keybinds = {}
 
-    -- Dragging Logic (Standard Roblox API)
-    local dragging, dragStart = false, nil
-    
-    local function onInputBegan(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    -- Dragging Logic (Optimized using InputChanged/InputEnded)
+    local dragging, dragInput, dragStart, startPos = false
+    header.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 and not dragInput then
             dragging = true
-            dragStart = UserInputService:GetMouseLocation()
-            mainFrame.Position = mainFrame.Position -- Cache initial position
+            dragInput = input
+            dragStart = input.Position
+            startPos = mainFrame.Position
         end
-    end
-
-    local function onInputEnded(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 and input == dragInput then
             dragging = false
+            dragInput = nil
         end
-    end
+    end)
 
-    local function onRenderStep()
-        if dragging then
-            local currentMouse = UserInputService:GetMouseLocation()
-            local delta = currentMouse - dragStart
-            
-            -- Apply delta to the frame's offset
-            local newX = mainFrame.Position.X.Offset + delta.X
-            local newY = mainFrame.Position.Y.Offset + delta.Y
-            
-            mainFrame.Position = UDim2.new(mainFrame.Position.X.Scale, newX, mainFrame.Position.Y.Scale, newY)
-            dragStart = currentMouse -- Update drag start for next frame
-        end
-    end
-
-    header.InputBegan:Connect(onInputBegan)
-    header.InputEnded:Connect(onInputEnded)
-    RunService.Stepped:Connect(onRenderStep) -- Use Stepped/RenderStepped for smooth dragging
-
-    -- Toggle UI with animation (Standard Roblox API)
+    -- Toggle UI (F5)
     local visible = true
     local function toggleUI()
         visible = not visible
-        -- Tween Size: Y-scale of 0 (closed) to 1 (open)
         local goal = {Size = visible and UDim2.new(0, 500, 0, 400) or UDim2.new(0, 500, 0, 0)}
         TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), goal):Play()
     end
@@ -134,7 +130,7 @@ function lib.Init(title, corner)
 
     local function createTab(tabName)
         local btn = Instance.new("TextButton")
-        c(btn, {Parent = tabBar, Size = UDim2.new(0, 80, 0, 30), BackgroundColor3 = Color3.fromRGB(50, 50, 50), Text = tabName, TextColor3 = Color3.new(1, 1, 1), TextScaled = true, AutoButtonColor = true, Font = Enum.Font.SourceSans})
+        c(btn, {Parent = tabBar, Size = UDim2.new(0, 80, 0, 30), BackgroundColor3 = UI_ELEMENT_COLOR, Text = tabName, TextColor3 = UI_TEXT_COLOR, TextScaled = true, AutoButtonColor = true, Font = FONT})
 
         local tabFrame = Instance.new("ScrollingFrame")
         c(tabFrame, {Parent = tabContainer, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Visible = false, CanvasSize = UDim2.new(0, 0, 0, 0)})
@@ -149,34 +145,27 @@ function lib.Init(title, corner)
             tabFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
         end)
 
-        -- Tab Selection Logic
         local function selectTab()
-            -- Deselect and hide all other tabs
             for k, v in pairs(tabs) do
                 v.frame.Visible = false
-                v.button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                v.button.BackgroundColor3 = UI_ELEMENT_COLOR
             end
-            -- Select and show current tab
             tabFrame.Visible = true
-            btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70) -- Highlight selected tab
+            btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
         end
 
         btn.MouseButton1Click:Connect(selectTab)
 
-        tabs[tabName] = {button = btn, frame = tabFrame, sections = {}, selectTab = selectTab} -- Expose selectTab
-
-        -- NOTE: Auto-selection logic for the first tab has been removed.
-        -- The user script must manually call CombatTab.selectTab() after creation.
-
+        tabs[tabName] = {button = btn, frame = tabFrame, sections = {}, selectTab = selectTab}
         return tabs[tabName]
     end
-    
-    --- Sections ---
-    
-    local function createSection(tab, sectionName)
-        local section = lib.makeRect(tab.frame, Vector2.new(0, 0), Color3.fromRGB(40, 40, 40), nil, 5)
 
-        local title = lib.makeText(section, sectionName, Vector2.new(0, 25), Color3.new(1, 1, 1))
+    --- Sections ---
+
+    local function createSection(tab, sectionName)
+        local section = lib.makeRect(tab.frame, Vector2.new(0, 0), UI_SECTION_COLOR, nil, 5)
+
+        local title = lib.makeText(section, sectionName, Vector2.new(0, 25), UI_TEXT_COLOR)
         title.Size = UDim2.new(1, 0, 0, 25)
         title.Position = UDim2.new(0, 0, 0, 0)
 
@@ -200,7 +189,7 @@ function lib.Init(title, corner)
     --- Elements ---
 
     local function addLabel(section, text)
-        local l = lib.makeText(section.content, text, Vector2.new(0, 25), Color3.new(1, 1, 1))
+        local l = lib.makeText(section.content, text, Vector2.new(0, 25), UI_TEXT_COLOR)
         l.TextXAlignment = Enum.TextXAlignment.Left
         l.Size = UDim2.new(1, 0, 0, 25)
         return l
@@ -214,59 +203,22 @@ function lib.Init(title, corner)
 
     local function addButton(section, text, callback, keybind)
         local b = Instance.new("TextButton")
-        c(b, {Parent = section.content, Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = Color3.fromRGB(60, 60, 60), Text = text, TextColor3 = Color3.new(1, 1, 1), TextScaled = true, AutoButtonColor = true, Font = Enum.Font.SourceSans})
+        c(b, {Parent = section.content, Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = Color3.fromRGB(60, 60, 60), Text = text, TextColor3 = UI_TEXT_COLOR, TextScaled = true, AutoButtonColor = true, Font = FONT})
         b.MouseButton1Click:Connect(callback or function() end)
 
         if keybind then keybinds[keybind] = function(inputState) if inputState == "Begin" then callback() end end end
         return b
     end
-    
-    -- Function to simulate a single click at the current mouse position
-    -- This uses the standard UserInputService, which only sends events locally.
-    -- It does NOT replace the functionality of an external executor's mouse1click.
-    local function simulateMouseClick()
-        local mousePos = UserInputService:GetMouseLocation()
-        local input = Instance.new("InputObject")
-        input:ChangeInputType(Enum.InputType.MouseButton1)
-        input:ChangeInputState(Enum.InputState.Begin)
-        input:ChangePosition(mousePos)
-        UserInputService:SendInput(input)
-
-        -- End the input immediately after
-        local inputEnd = Instance.new("InputObject")
-        inputEnd:ChangeInputType(Enum.InputType.MouseButton1)
-        inputEnd:ChangeInputState(Enum.InputState.End)
-        inputEnd:ChangePosition(mousePos)
-        UserInputService:SendInput(inputEnd)
-    end
-    
-    -- NOTE: A dedicated addSlider function is typically required here, 
-    -- as it was used in the user script but not defined in the lib.
-    -- Assuming a placeholder for now to allow the script to run.
-    local function addSlider(section, text, min, max, default, callback)
-        local f = lib.makeRect(section.content,Vector2.new(0,30),Color3.fromRGB(50,50,50),nil,5)
-        f.Size = UDim2.new(1,0,0,30) 
-        local l = lib.makeText(f, text .. ": " .. tostring(default), Vector2.new(0, 30), Color3.new(1,1,1))
-        l.Size = UDim2.new(1, 0, 1, 0)
-        l.TextXAlignment = Enum.TextXAlignment.Left
-        
-        -- Placeholder Slider Logic (actual Slider UI omitted for brevity)
-        warn("addSlider is a placeholder. Slider UI logic is missing.")
-        
-        -- A more complete lib would include the UI construction and input detection for dragging the thumb.
-        
-        return f
-    end
 
     local function addToggle(section, text, default, callback, keybind, mode)
-        local f = lib.makeRect(section.content, Vector2.new(0, 30), Color3.fromRGB(50, 50, 50), nil, 5)
+        local f = lib.makeRect(section.content, Vector2.new(0, 30), UI_ELEMENT_COLOR, nil, 5)
         f.Size = UDim2.new(1, 0, 0, 30)
 
-        local lbl = lib.makeText(f, text, Vector2.new(0, 30), Color3.new(1, 1, 1))
+        local lbl = lib.makeText(f, text, Vector2.new(0, 30), UI_TEXT_COLOR)
         lbl.Size = UDim2.new(0.7, 0, 1, 0)
         lbl.TextXAlignment = Enum.TextXAlignment.Left
 
-        local box = lib.makeRect(f, Vector2.new(20, 20), default and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0), nil, 3)
+        local box = lib.makeRect(f, Vector2.new(20, 20), default and UI_TOGGLE_ON or UI_TOGGLE_OFF, nil, 3)
         box.Position = UDim2.new(0.75, 0, 0.5, -10)
         Instance.new("UICorner", box).CornerRadius = UDim.new(0, 3)
 
@@ -274,7 +226,7 @@ function lib.Init(title, corner)
 
         local function toggleState()
             toggled = not toggled
-            box.BackgroundColor3 = toggled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+            box.BackgroundColor3 = toggled and UI_TOGGLE_ON or UI_TOGGLE_OFF
             if callback then callback(toggled) end
         end
 
@@ -283,7 +235,7 @@ function lib.Init(title, corner)
                 if mode == "Hold" then
                     if not toggled then
                         toggled = true
-                        box.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+                        box.BackgroundColor3 = UI_TOGGLE_ON
                         if callback then callback(true) end
                     end
                 else
@@ -294,7 +246,7 @@ function lib.Init(title, corner)
         f.InputEnded:Connect(function(input)
             if mode == "Hold" and input.UserInputType == Enum.UserInputType.MouseButton1 then
                 toggled = false
-                box.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+                box.BackgroundColor3 = UI_TOGGLE_OFF
                 if callback then callback(false) end
             end
         end)
@@ -305,21 +257,92 @@ function lib.Init(title, corner)
                 elseif mode == "Hold" then
                     if inputState == "Begin" then
                         toggled = true
-                        box.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+                        box.BackgroundColor3 = UI_TOGGLE_ON
                         if callback then callback(true) end
                     elseif inputState == "End" then
                         toggled = false
-                        box.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+                        box.BackgroundColor3 = UI_TOGGLE_OFF
                         if callback then callback(false) end
                     end
                 end
             end
         end
-
-        return f
+        return {frame = f, setState = function(state) toggled = state; box.BackgroundColor3 = state and UI_TOGGLE_ON or UI_TOGGLE_OFF end}
     end
 
-    -- Input for keybinds (Standard Roblox API)
+    local function addSlider(section, text, min, max, default, callback)
+        local frameHeight = 40
+        local f = lib.makeRect(section.content, Vector2.new(0, frameHeight), UI_ELEMENT_COLOR, nil, 5)
+        f.Size = UDim2.new(1, 0, 0, frameHeight)
+
+        local currentValue = default
+        
+        local label = lib.makeText(f, text .. ": " .. string.format("%.1f", currentValue), Vector2.new(0, 20), UI_TEXT_COLOR)
+        label.Size = UDim2.new(1, 0, 0, 18)
+        label.Position = UDim2.new(0, 5, 0, 2)
+        label.TextXAlignment = Enum.TextXAlignment.Left
+
+        local sliderBar = lib.makeRect(f, Vector2.new(0, 8), Color3.fromRGB(40, 40, 40), nil, 4)
+        sliderBar.Size = UDim2.new(1, -10, 0, 8)
+        sliderBar.Position = UDim2.new(0, 5, 0, 22)
+        
+        local fill = lib.makeRect(sliderBar, Vector2.new(0, 8), UI_ACCENT_COLOR, nil, 4)
+        fill.Size = UDim2.new(0, 0, 1, 0)
+        
+        local thumb = lib.makeRect(sliderBar, Vector2.new(12, 12), Color3.fromRGB(255, 255, 255), nil, 6)
+        thumb.Position = UDim2.new(0, -6, 0.5, -6)
+        
+        local dragging = false
+
+        local function updateValue(inputX)
+            local barWidth = sliderBar.AbsoluteSize.X
+            local ratio = math.max(0, math.min(1, (inputX - sliderBar.AbsolutePosition.X) / barWidth))
+            
+            local value = min + (max - min) * ratio
+            
+            -- Simple rounding to one decimal place for display
+            value = math.floor(value * 10 + 0.5) / 10
+            
+            -- Apply step rounding if necessary (not fully implemented here, use simple rounding)
+            
+            currentValue = value
+            
+            -- Update UI
+            local fillScale = (value - min) / (max - min)
+            fill.Size = UDim2.new(fillScale, 0, 1, 0)
+            thumb.Position = UDim2.new(fillScale, -6, 0.5, -6)
+            label.Text = text .. ": " .. string.format("%.1f", currentValue)
+            
+            if callback then callback(currentValue) end
+        end
+
+        sliderBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                updateValue(input.Position.X)
+            end
+        end)
+        
+        local mouseMoveConn
+        mouseMoveConn = UserInputService.InputChanged:Connect(function(input)
+            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                updateValue(input.Position.X)
+            end
+        end)
+        
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+            end
+        end)
+
+        -- Initialize position
+        updateValue(sliderBar.AbsolutePosition.X + (default - min) / (max - min) * sliderBar.AbsoluteSize.X)
+        
+        return {frame=f, set=function(val) updateValue(sliderBar.AbsolutePosition.X + (val - min) / (max - min) * sliderBar.AbsoluteSize.X) end, getValue=function() return currentValue end}
+    end
+
+    -- Input for keybinds
     UserInputService.InputBegan:Connect(function(input)
         if not input.Processed and keybinds[input.KeyCode] then keybinds[input.KeyCode]("Begin") end
     end)
@@ -332,8 +355,7 @@ function lib.Init(title, corner)
         createTab = createTab, createSection = createSection,
         addLabel = addLabel, addSeparator = addSeparator,
         addButton = addButton, addToggle = addToggle,
-        addSlider = addSlider, -- Placeholder
-        simulateMouseClick = simulateMouseClick -- Export the standard click function
+        addSlider = addSlider
     }
 end
 
