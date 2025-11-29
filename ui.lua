@@ -4,14 +4,13 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 
--- Modern UI Constants
-local UI_BG_COLOR = Color3.fromRGB(35, 39, 42)    -- Darker background
-local UI_ELEMENT_COLOR = Color3.fromRGB(44, 47, 51) -- Dark element color
-local UI_SECTION_COLOR = Color3.fromRGB(54, 57, 63) -- Slightly lighter for grouping
-local UI_ACCENT_COLOR = Color3.fromRGB(88, 101, 242) -- Discord-like blurple accent
-local UI_TOGGLE_ON = Color3.fromRGB(67, 181, 129)  -- Greenish on
-local UI_TOGGLE_OFF = Color3.fromRGB(240, 71, 71)   -- Reddish off
-local UI_TEXT_COLOR = Color3.new(0.9, 0.9, 0.9)  -- Off-white text
+local UI_BG_COLOR = Color3.fromRGB(35, 39, 42)
+local UI_ELEMENT_COLOR = Color3.fromRGB(44, 47, 51)
+local UI_SECTION_COLOR = Color3.fromRGB(54, 57, 63)
+local UI_ACCENT_COLOR = Color3.fromRGB(88, 101, 242)
+local UI_TOGGLE_ON = Color3.fromRGB(67, 181, 129)
+local UI_TOGGLE_OFF = Color3.fromRGB(240, 71, 71)
+local UI_TEXT_COLOR = Color3.new(0.9, 0.9, 0.9)
 local FONT = Enum.Font.SourceSansBold
 local CORNER_RADIUS = 6
 
@@ -42,7 +41,7 @@ function lib.makeRect(parent, size, bg, stroke, corner)
 
     local s = Instance.new("UIStroke")
     s.Thickness = 1
-    s.Color = stroke or Color3.fromRGB(25, 29, 32) -- Dark border for "shadow" effect
+    s.Color = stroke or Color3.fromRGB(25, 29, 32)
     s.Parent = f
 
     if corner and corner > 0 then
@@ -88,7 +87,6 @@ function lib.Init(title, corner)
     local tabs = {}
     local keybinds = {}
 
-    -- Dragging Logic
     local dragging, dragInput, dragStart, startPos = false
     header.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 and not dragInput then
@@ -111,7 +109,6 @@ function lib.Init(title, corner)
         end
     end)
 
-    -- Toggle UI (F5)
     local visible = true
     local function toggleUI()
         visible = not visible
@@ -124,12 +121,11 @@ function lib.Init(title, corner)
         end
     end)
 
-    -- === TOAST NOTIFICATION SYSTEM ===
     local toastContainer = Instance.new("Frame")
     c(toastContainer, {
         Parent = gui,
         Size = UDim2.new(0, 300, 1, 0),
-        Position = UDim2.new(1, -310, 0, 0), -- Bottom right corner position (310 = width + margin)
+        Position = UDim2.new(1, -310, 0, 0),
         BackgroundTransparency = 1,
         ClipsDescendants = true
     })
@@ -145,7 +141,7 @@ function lib.Init(title, corner)
 
     function lib.showToast(title, description, duration)
         local toast = lib.makeRect(toastContainer, Vector2.new(300, 70), UI_ELEMENT_COLOR, Color3.fromRGB(60, 60, 60), CORNER_RADIUS)
-        toast.Size = UDim2.new(0, 300, 0, 0) -- Start small for smooth expansion
+        toast.Size = UDim2.new(0, 300, 0, 0)
         toast.BackgroundTransparency = 1
 
         local titleLabel = lib.makeText(toast, title, Vector2.new(280, 20), UI_ACCENT_COLOR, Enum.TextXAlignment.Left)
@@ -159,7 +155,6 @@ function lib.Init(title, corner)
         descLabel.TextScaled = false
         descLabel.TextSize = 14
 
-        -- Timer Bar
         local barFrame = lib.makeRect(toast, Vector2.new(280, 3), UI_SECTION_COLOR, nil, 1)
         barFrame.Size = UDim2.new(1, 0, 0, 3)
         barFrame.Position = UDim2.new(0, 0, 1, -3)
@@ -167,16 +162,13 @@ function lib.Init(title, corner)
         local timerBar = lib.makeRect(barFrame, Vector2.new(280, 3), UI_ACCENT_COLOR, nil, 1)
         timerBar.Size = UDim2.new(1, 0, 1, 0)
 
-        -- 1. Fade In and Expand
         local tweenInfoIn = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         TweenService:Create(toast, tweenInfoIn, {Size = UDim2.new(0, 300, 0, 70), BackgroundTransparency = 0}):Play()
         
-        -- 2. Start Timer Bar Shrink
         local tweenInfoTimer = TweenInfo.new(duration or 3, Enum.EasingStyle.Linear)
         TweenService:Create(timerBar, tweenInfoTimer, {Size = UDim2.new(0, 0, 1, 0)}):Play()
 
         task.delay(duration or 3, function()
-            -- 3. Fade Out and Collapse
             local tweenInfoOut = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
             local fadeOut = TweenService:Create(toast, tweenInfoOut, {Size = UDim2.new(0, 300, 0, 0), BackgroundTransparency = 1})
             
@@ -184,7 +176,6 @@ function lib.Init(title, corner)
             toast:Destroy()
         end)
     end
-    -- === END TOAST SYSTEM ===
 
     local function createTab(tabName)
         local btn = Instance.new("TextButton")
@@ -374,7 +365,7 @@ function lib.Init(title, corner)
             local ratio = relativeX / barWidth
             
             local value = min + (max - min) * ratio
-            value = math.floor(value * 10 + 0.5) / 10 -- Round to one decimal
+            value = math.floor(value * 10 + 0.5) / 10
             
             return value, ratio
         end
@@ -450,7 +441,7 @@ function lib.Init(title, corner)
         addLabel = addLabel, addSeparator = addSeparator,
         addButton = addButton, addToggle = addToggle,
         addSlider = addSlider,
-        showToast = lib.showToast -- EXPOSE TOAST FUNCTION
+        showToast = lib.showToast
     }
 end
 
