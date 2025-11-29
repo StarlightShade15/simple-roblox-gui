@@ -284,9 +284,22 @@ function Tab.new(windowContainer: GuiObject, tabName: string)
     listLayout.Padding = UDim.new(0, UI_CONFIG.PADDING)
     listLayout.Parent = self.InnerContainer
     
-    self.InnerContainer.SizeChanged:Connect(function()
-        self.Container.CanvasSize = UDim2.new(0, 0, 0, self.InnerContainer.AbsoluteSize.Y)
-    end)
+    -- Patched: Use a loop to update CanvasSize instead of the unreliable SizeChanged event
+    coroutine.wrap(function()
+        local lastSize = self.InnerContainer.AbsoluteSize.Y
+        while self.InnerContainer.Parent do
+            local currentSize = self.InnerContainer.AbsoluteSize.Y
+            if currentSize ~= lastSize then
+                self.Container.CanvasSize = UDim2.new(0, 0, 0, currentSize)
+                lastSize = currentSize
+            end
+            if task.wait then
+                task.wait(0.1)
+            else
+                wait(0.1)
+            end
+        end
+    end)()
 
     return self
 end
