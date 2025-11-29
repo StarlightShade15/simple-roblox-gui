@@ -327,7 +327,7 @@ function lib.Init(title, corner)
         end
         
         local function moveDrag(input, gameProcessedEvent)
-            if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement and not gameProcessedEvent then
                 handleInput(input)
             end
         end
@@ -353,10 +353,14 @@ function lib.Init(title, corner)
     end
 
     UserInputService.InputBegan:Connect(function(input, processed)
-        if not processed and keybinds[input.KeyCode] then keybinds[input.KeyCode]("Begin") end
+        if input.UserInputType.Name:find("Key") and not processed and keybinds[input.KeyCode] then 
+            keybinds[input.KeyCode]("Begin") 
+        end
     end)
     UserInputService.InputEnded:Connect(function(input, processed)
-        if not processed and keybinds[input.KeyCode] then keybinds[input.KeyCode]("End") end
+        if input.UserInputType.Name:find("Key") and not processed and keybinds[input.KeyCode] then 
+            keybinds[input.KeyCode]("End") 
+        end
     end)
 
     return {
