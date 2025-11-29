@@ -109,41 +109,41 @@ function lib.Init(title, corner)
         end
     end)
 
-    local function setFrameTransparency(frame, transparency)
-        frame.BackgroundTransparency = transparency
+    local function tweenChildrenTransparency(frame, targetTransparency, tweenInfo)
         for _, child in ipairs(frame:GetChildren()) do
             if child:IsA("TextLabel") or child:IsA("TextButton") then
-                child.TextTransparency = transparency
+                TweenService:Create(child, tweenInfo, {TextTransparency = targetTransparency}):Play()
                 if child:IsA("TextButton") then
-                    child.BackgroundTransparency = transparency
+                    TweenService:Create(child, tweenInfo, {BackgroundTransparency = targetTransparency}):Play()
                 end
             elseif child:IsA("Frame") or child:IsA("ScrollingFrame") then
-                setFrameTransparency(child, transparency)
+                TweenService:Create(child, tweenInfo, {BackgroundTransparency = targetTransparency}):Play()
+                tweenChildrenTransparency(child, targetTransparency, tweenInfo)
             elseif child:IsA("UIStroke") then
-                child.Transparency = transparency
+                TweenService:Create(child, tweenInfo, {Transparency = targetTransparency}):Play()
             end
         end
     end
 
     local visible = false
+    mainFrame.BackgroundTransparency = 1
     mainFrame.Visible = false
-    setFrameTransparency(mainFrame, 1)
+    tweenChildrenTransparency(mainFrame, 1, TweenInfo.new(0))
 
     local function toggleUI()
         visible = not visible
-        
+        local duration = 0.25
+        local tweenInfoIn = TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local tweenInfoOut = TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+
         if visible then
             mainFrame.Visible = true
-            local goal = {BackgroundTransparency = 0} 
-            local fadeIn = TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), goal)
-            fadeIn:Play()
-            setFrameTransparency(mainFrame, 0) 
-
+            TweenService:Create(mainFrame, tweenInfoIn, {BackgroundTransparency = 0}):Play()
+            tweenChildrenTransparency(mainFrame, 0, tweenInfoIn)
         else
-            local goal = {BackgroundTransparency = 1} 
-            local fadeOut = TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), goal)
+            local fadeOut = TweenService:Create(mainFrame, tweenInfoOut, {BackgroundTransparency = 1})
             fadeOut:Play()
-            setFrameTransparency(mainFrame, 1) 
+            tweenChildrenTransparency(mainFrame, 1, tweenInfoOut)
 
             fadeOut.Completed:Wait()
             mainFrame.Visible = false
@@ -175,38 +175,63 @@ function lib.Init(title, corner)
     })
 
     function lib.showToast(title, description, duration)
+        duration = duration or 3
+        local fadeDuration = 0.25
+
         local toast = lib.makeRect(toastContainer, Vector2.new(300, 70), UI_ELEMENT_COLOR, Color3.fromRGB(60, 60, 60), CORNER_RADIUS)
-        toast.Size = UDim2.new(0, 300, 0, 0)
+        toast.Size = UDim2.new(0, 300, 0, 70)
         toast.BackgroundTransparency = 1
 
         local titleLabel = lib.makeText(toast, title, Vector2.new(280, 20), UI_ACCENT_COLOR, Enum.TextXAlignment.Left)
         titleLabel.Size = UDim2.new(1, -20, 0, 20)
         titleLabel.Position = UDim2.new(0, 10, 0, 5)
         titleLabel.Font = FONT
+        titleLabel.TextTransparency = 1
 
         local descLabel = lib.makeText(toast, description, Vector2.new(280, 40), UI_TEXT_COLOR, Enum.TextXAlignment.Left)
         descLabel.Size = UDim2.new(1, -20, 0, 30)
         descLabel.Position = UDim2.new(0, 10, 0, 25)
         descLabel.TextScaled = false
         descLabel.TextSize = 14
+        descLabel.TextTransparency = 1
 
         local barFrame = lib.makeRect(toast, Vector2.new(280, 3), UI_SECTION_COLOR, nil, 1)
         barFrame.Size = UDim2.new(1, 0, 0, 3)
         barFrame.Position = UDim2.new(0, 0, 1, -3)
+        barFrame.BackgroundTransparency = 1
+        barFrame.UIStroke.Transparency = 1
+
 
         local timerBar = lib.makeRect(barFrame, Vector2.new(280, 3), UI_ACCENT_COLOR, nil, 1)
         timerBar.Size = UDim2.new(1, 0, 1, 0)
+        timerBar.UIStroke.Transparency = 1
 
-        local tweenInfoIn = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        TweenService:Create(toast, tweenInfoIn, {Size = UDim2.new(0, 300, 0, 70), BackgroundTransparency = 0}):Play()
+        -- Fade In
+        local tweenInfoIn = TweenInfo.new(fadeDuration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        TweenService:Create(toast, tweenInfoIn, {BackgroundTransparency = 0}):Play()
+        TweenService:Create(titleLabel, tweenInfoIn, {TextTransparency = 0}):Play()
+        TweenService:Create(descLabel, tweenInfoIn, {TextTransparency = 0}):Play()
+        TweenService:Create(barFrame, tweenInfoIn, {BackgroundTransparency = 0}):Play()
+        TweenService:Create(barFrame.UIStroke, tweenInfoIn, {Transparency = 0}):Play()
+        TweenService:Create(timerBar, tweenInfoIn, {BackgroundTransparency = 0}):Play()
         
-        local tweenInfoTimer = TweenInfo.new(duration or 3, Enum.EasingStyle.Linear)
-        TweenService:Create(timerBar, tweenInfoTimer, {Size = UDim2.new(0, 0, 1, 0)}):Play()
+        -- Timer Bar
+        local tweenInfoTimer = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+        local timerTween = TweenService:Create(timerBar, tweenInfoTimer, {Size = UDim2.new(0, 0, 1, 0)})
+        timerTween:Play()
 
-        task.delay(duration or 3, function()
-            local tweenInfoOut = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-            local fadeOut = TweenService:Create(toast, tweenInfoOut, {Size = UDim2.new(0, 300, 0, 0), BackgroundTransparency = 1})
-            
+        task.delay(duration, function()
+            -- Fade Out
+            local tweenInfoOut = TweenInfo.new(fadeDuration, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+            local fadeOut = TweenService:Create(toast, tweenInfoOut, {BackgroundTransparency = 1})
+
+            TweenService:Create(titleLabel, tweenInfoOut, {TextTransparency = 1}):Play()
+            TweenService:Create(descLabel, tweenInfoOut, {TextTransparency = 1}):Play()
+            TweenService:Create(barFrame, tweenInfoOut, {BackgroundTransparency = 1}):Play()
+            TweenService:Create(barFrame.UIStroke, tweenInfoOut, {Transparency = 1}):Play()
+            TweenService:Create(timerBar, tweenInfoOut, {BackgroundTransparency = 1}):Play()
+
+            fadeOut:Play()
             fadeOut.Completed:Wait()
             toast:Destroy()
         end)
