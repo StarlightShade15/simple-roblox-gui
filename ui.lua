@@ -284,9 +284,9 @@ function Tab.new(windowContainer: GuiObject, tabName: string)
     listLayout.Padding = UDim.new(0, UI_CONFIG.PADDING)
     listLayout.Parent = self.InnerContainer
     
-    -- Patched: Use a loop to update CanvasSize instead of the unreliable SizeChanged event
+    -- Patched: Use a polling loop to update CanvasSize (replaces unreliable SizeChanged)
     coroutine.wrap(function()
-        local lastSize = self.InnerContainer.AbsoluteSize.Y
+        local lastSize = 0
         while self.InnerContainer.Parent do
             local currentSize = self.InnerContainer.AbsoluteSize.Y
             if currentSize ~= lastSize then
@@ -383,13 +383,18 @@ function Window.new(title: string)
     titleBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             local startPos = self.Container.AbsolutePosition
-            local startMousePos = Players.LocalPlayer:GetMouse().AbsolutePosition
+            local mouse = Players.LocalPlayer:GetMouse()
+            local startMouseX = mouse.Position.X -- Patched: Use Position instead of AbsolutePosition
+            local startMouseY = mouse.Position.Y -- Patched: Use Position instead of AbsolutePosition
             
             drag = RunService.Heartbeat:Connect(function()
-                local newMousePos = Players.LocalPlayer:GetMouse().AbsolutePosition
-                local delta = newMousePos - startMousePos
+                local newMouseX = mouse.Position.X -- Patched: Use Position
+                local newMouseY = mouse.Position.Y -- Patched: Use Position
                 
-                self.Container.Position = UDim2.fromOffset(startPos.X + delta.X, startPos.Y + delta.Y)
+                local deltaX = newMouseX - startMouseX
+                local deltaY = newMouseY - startMouseY
+                
+                self.Container.Position = UDim2.fromOffset(startPos.X + deltaX, startPos.Y + deltaY)
             end)
         end
     end)
