@@ -123,7 +123,6 @@ function lib.Init(title, corner)
                 TweenService:Create(child, tweenInfo, {Transparency = targetTransparency}):Play()
                 
             elseif child:IsA("Frame") or child:IsA("ScrollingFrame") then
-                -- Check if it's the dropdown list, which should stay invisible
                 if child.Name ~= "DropdownList" then
                      tweenChildrenTransparency(child, targetTransparency, tweenInfo)
                 end
@@ -256,7 +255,7 @@ function lib.Init(title, corner)
         local layout = Instance.new("UIListLayout")
         c(layout, {
             Parent = tabFrame,
-            Padding = UDim.new(0, 6), -- Tighter padding
+            Padding = UDim.new(0, 6),
             SortOrder = Enum.SortOrder.LayoutOrder
         })
 
@@ -293,12 +292,12 @@ function lib.Init(title, corner)
         local layout = Instance.new("UIListLayout")
         c(layout, {
             Parent = secContent,
-            Padding = UDim.new(0, 6), -- Tighter padding
+            Padding = UDim.new(0, 6),
             SortOrder = Enum.SortOrder.LayoutOrder
         })
 
         layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            section.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y + 35) -- Reduced height
+            section.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y + 35)
         end)
 
         section.Parent = tab.frame
@@ -315,7 +314,6 @@ function lib.Init(title, corner)
     local function addSeparator(section)
         local s = lib.makeRect(section.content, Vector2.new(0, 2), UI_ELEMENT_COLOR, nil, 0)
         s.Size = UDim2.new(1, 0, 0, 2)
-        -- Add a tiny buffer above and below the separator
         local spacer = lib.makeRect(section.content, Vector2.new(0, 4), Color3.new(1,1,1), nil, 0)
         spacer.BackgroundTransparency = 1
         s.Parent = section.content
@@ -323,7 +321,7 @@ function lib.Init(title, corner)
     end
 
     local function addButton(section, text, callback, keybind)
-        local b = lib.makeRect(section.content, Vector2.new(0, 30), UI_ELEMENT_COLOR, nil, CORNER_RADIUS) -- Smaller height
+        local b = lib.makeRect(section.content, Vector2.new(0, 30), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
         b.Size = UDim2.new(1, 0, 0, 30)
 
         local btnText = lib.makeText(b, text, Vector2.new(0, 30), UI_TEXT_COLOR, Enum.TextXAlignment.Center, 14)
@@ -340,14 +338,14 @@ function lib.Init(title, corner)
     end
 
     local function addToggle(section, text, default, callback, keybind, mode)
-        local f = lib.makeRect(section.content, Vector2.new(0, 30), UI_ELEMENT_COLOR, nil, CORNER_RADIUS) -- Smaller height
+        local f = lib.makeRect(section.content, Vector2.new(0, 30), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
         f.Size = UDim2.new(1, 0, 0, 30)
 
         local lbl = lib.makeText(f, text, Vector2.new(0, 30), UI_TEXT_COLOR, Enum.TextXAlignment.Left, 14)
         lbl.Size = UDim2.new(0.7, 0, 1, 0)
         lbl.Position = UDim2.new(0, 10, 0, 0)
 
-        local box = lib.makeRect(f, Vector2.new(18, 18), default and UI_TOGGLE_ON or UI_TOGGLE_OFF, Color3.fromRGB(30,30,30), 4) -- Smaller box
+        local box = lib.makeRect(f, Vector2.new(18, 18), default and UI_TOGGLE_ON or UI_TOGGLE_OFF, Color3.fromRGB(30,30,30), 4)
         box.Position = UDim2.new(1, -28, 0.5, -9)
         
         local toggled = default
@@ -403,7 +401,7 @@ function lib.Init(title, corner)
     end
 
     local function addSlider(section, text, min, max, default, callback)
-        local frameHeight = 40 -- Smaller height
+        local frameHeight = 40
         local f = lib.makeRect(section.content, Vector2.new(0, frameHeight), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
         f.Size = UDim2.new(1, 0, 0, frameHeight)
 
@@ -413,14 +411,14 @@ function lib.Init(title, corner)
         label.Size = UDim2.new(1, -10, 0, 15)
         label.Position = UDim2.new(0, 10, 0, 3)
 
-        local sliderBar = lib.makeRect(f, Vector2.new(0, 4), UI_SECTION_BG_COLOR, nil, 2) -- Thinner bar
+        local sliderBar = lib.makeRect(f, Vector2.new(0, 4), UI_SECTION_BG_COLOR, nil, 2)
         sliderBar.Size = UDim2.new(1, -20, 0, 4)
         sliderBar.Position = UDim2.new(0, 10, 0, 22)
         
         local fill = lib.makeRect(sliderBar, Vector2.new(0, 4), UI_ACCENT_COLOR, nil, 2)
         fill.Size = UDim2.new(0, 0, 1, 0)
         
-        local thumb = lib.makeRect(sliderBar, Vector2.new(12, 12), Color3.new(1, 1, 1), Color3.fromRGB(30,30,30), 6) -- Smaller thumb
+        local thumb = lib.makeRect(sliderBar, Vector2.new(12, 12), Color3.new(1, 1, 1), Color3.fromRGB(30,30,30), 6)
         thumb.Position = UDim2.new(0, -6, 0.5, -6)
         
         local isDragging = false
@@ -513,7 +511,7 @@ function lib.Init(title, corner)
             Parent = gui, 
             Name = "DropdownList",
             Size = UDim2.new(0, f.AbsoluteSize.X, 0, math.min(#options * 25, 150)),
-            Position = UDim2.new(0, 0, 0, 0), -- Position is set dynamically
+            Position = UDim2.new(0, 0, 0, 0),
             BackgroundColor3 = UI_ELEMENT_COLOR,
             BackgroundTransparency = 0,
             Visible = false,
