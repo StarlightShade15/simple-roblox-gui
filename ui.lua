@@ -109,12 +109,47 @@ function lib.Init(title, corner)
         end
     end)
 
-    local visible = true
+    local function setFrameTransparency(frame, transparency)
+        frame.BackgroundTransparency = transparency
+        for _, child in ipairs(frame:GetChildren()) do
+            if child:IsA("TextLabel") or child:IsA("TextButton") then
+                child.TextTransparency = transparency
+                if child:IsA("TextButton") then
+                    child.BackgroundTransparency = transparency
+                end
+            elseif child:IsA("Frame") or child:IsA("ScrollingFrame") then
+                setFrameTransparency(child, transparency)
+            elseif child:IsA("UIStroke") then
+                child.Transparency = transparency
+            end
+        end
+    end
+
+    local visible = false
+    mainFrame.Visible = false
+    setFrameTransparency(mainFrame, 1)
+
     local function toggleUI()
         visible = not visible
-        local goal = {Size = visible and UDim2.new(0, 500, 0, 400) or UDim2.new(0, 500, 0, 0)}
-        TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), goal):Play()
+        
+        if visible then
+            mainFrame.Visible = true
+            local goal = {BackgroundTransparency = 0} 
+            local fadeIn = TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), goal)
+            fadeIn:Play()
+            setFrameTransparency(mainFrame, 0) 
+
+        else
+            local goal = {BackgroundTransparency = 1} 
+            local fadeOut = TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), goal)
+            fadeOut:Play()
+            setFrameTransparency(mainFrame, 1) 
+
+            fadeOut.Completed:Wait()
+            mainFrame.Visible = false
+        end
     end
+    
     UserInputService.InputBegan:Connect(function(input, processed)
         if not processed and input.KeyCode == Enum.KeyCode.F5 then
             toggleUI()
