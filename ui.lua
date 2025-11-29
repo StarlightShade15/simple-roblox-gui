@@ -5,6 +5,7 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
+-- UI Constants
 local UI_BG_COLOR = Color3.fromRGB(30, 30, 30)
 local UI_ELEMENT_COLOR = Color3.fromRGB(50, 50, 50)
 local UI_SECTION_COLOR = Color3.fromRGB(40, 40, 40)
@@ -14,10 +15,13 @@ local UI_TOGGLE_OFF = Color3.fromRGB(255, 0, 0)
 local UI_TEXT_COLOR = Color3.new(1, 1, 1)
 local FONT = Enum.Font.SourceSans
 
+-- Helper function to apply properties to an instance (shorthand)
 local function c(o, p)
     for k, v in pairs(p) do o[k] = v end
     return o
 end
+
+--- UI Element Constructors ---
 
 function lib.makeText(parent, text, size, color)
     local l = Instance.new("TextLabel")
@@ -49,6 +53,8 @@ function lib.makeRect(parent, size, bg, stroke, corner)
     end
     return f
 end
+
+--- Core Window Initialization ---
 
 function lib.Init(title, corner)
     local gui = Instance.new("ScreenGui")
@@ -84,6 +90,7 @@ function lib.Init(title, corner)
     local tabs = {}
     local keybinds = {}
 
+    -- Dragging Logic
     local dragging, dragInput, dragStart, startPos = false
     header.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 and not dragInput then
@@ -106,6 +113,7 @@ function lib.Init(title, corner)
         end
     end)
 
+    -- Toggle UI (F5)
     local visible = true
     local function toggleUI()
         visible = not visible
@@ -117,6 +125,8 @@ function lib.Init(title, corner)
             toggleUI()
         end
     end)
+
+    --- Tabs ---
 
     local function createTab(tabName)
         local btn = Instance.new("TextButton")
@@ -150,6 +160,8 @@ function lib.Init(title, corner)
         return tabs[tabName]
     end
 
+    --- Sections ---
+
     local function createSection(tab, sectionName)
         local section = lib.makeRect(tab.frame, Vector2.new(0, 0), UI_SECTION_COLOR, nil, 5)
 
@@ -173,6 +185,8 @@ function lib.Init(title, corner)
         tab.sections[sectionName] = {frame = section, content = secContent}
         return tab.sections[sectionName]
     end
+
+    --- Elements ---
 
     local function addLabel(section, text)
         local l = lib.makeText(section.content, text, Vector2.new(0, 25), UI_TEXT_COLOR)
@@ -278,51 +292,83 @@ function lib.Init(title, corner)
         local thumb = lib.makeRect(sliderBar, Vector2.new(12, 12), Color3.fromRGB(255, 255, 255), nil, 6)
         thumb.Position = UDim2.new(0, -6, 0.5, -6)
         
-        local dragging = false
+        local isDragging = false
 
-        local function updateValue(inputX)
+        local function calculateValue(inputX)
+            local barPos = sliderBar.AbsolutePosition.X
             local barWidth = sliderBar.AbsoluteSize.X
-            local ratio = math.max(0, math.min(1, (inputX - sliderBar.AbsolutePosition.X) / barWidth))
+            
+            -- Calculate the horizontal distance of the mouse relative to the bar's start
+            local relativeX = math.clamp(inputX - barPos, 0, barWidth)
+            local ratio = relativeX / barWidth
             
             local value = min + (max - min) * ratio
             
+            -- Round to one decimal place
             value = math.floor(value * 10 + 0.5) / 10
             
+            return value, ratio
+        end
+        
+        local function updateUI(value, ratio)
             currentValue = value
-            
-            local fillScale = (value - min) / (max - min)
-            fill.Size = UDim2.new(fillScale, 0, 1, 0)
-            thumb.Position = UDim2.new(fillScale, -6, 0.5, -6)
+            fill.Size = UDim2.new(ratio, 0, 1, 0)
+            thumb.Position = UDim2.new(ratio, -6, 0.5, -6)
             label.Text = text .. ": " .. string.format("%.1f", currentValue)
-            
             if callback then callback(currentValue) end
         end
 
-        sliderBar.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = true
-                updateValue(input.Position.X)
+        local function handleInput(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                local value, ratio = calculateValue(input.Position.X)
+                updateUI(value, ratio)
             end
-        end)
-        
-        local mouseMoveConn
-        mouseMoveConn = UserInputService.InputChanged:Connect(function(input)
-            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                updateValue(input.Position.X)
-            end
-        end)
-        
-        UserInputService.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = false
-            end
-        end)
+        end
 
-        updateValue(sliderBar.AbsolutePosition.X + (default - min) / (max - min) * sliderBar.AbsoluteSize.X)
+        -- Clicking anywhere on the bar/thumb starts the drag and updates the value
+        local function startDrag(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                isDragging = true
+                handleInput(input) -- Handle initial click position
+            end
+        end
         
-        return {frame=f, set=function(val) updateValue(sliderBar.AbsolutePosition.X + (val - min) / (max - min) * sliderBar.AbsoluteSize.X) end, getValue=function() return currentValue end}
+        -- Stop dragging globally
+        local function endDrag(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                isDragging = false
+            end
+        end
+        
+        -- Handle movement globally while dragging is active
+        local function moveDrag(input)
+            if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                handleInput(input)
+            end
+        end
+
+        sliderBar.InputBegan:Connect(startDrag)
+        thumb.InputBegan:Connect(startDrag)
+        
+        UserInputService.InputChanged:Connect(moveDrag)
+        UserInputService.InputEnded:Connect(endDrag)
+        
+        -- Initial state update
+        local initRatio = (default - min) / (max - min)
+        updateUI(default, initRatio)
+        
+        return {
+            frame = f, 
+            set = function(val) 
+                local ratio = (val - min) / (max - min)
+                local value = math.floor(val * 10 + 0.5) / 10
+                updateUI(value, ratio) 
+            end, 
+            getValue = function() return currentValue end
+        }
     end
 
+    -- Input for keybinds
     UserInputService.InputBegan:Connect(function(input)
         if not input.Processed and keybinds[input.KeyCode] then keybinds[input.KeyCode]("Begin") end
     end)
