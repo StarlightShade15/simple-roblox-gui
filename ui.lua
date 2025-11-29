@@ -568,7 +568,7 @@ function lib.Init(title, corner)
     UserInputService.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             local target = input.Target
-            local isDropdown = dropdownButtons[target] or target.Parent.Name == "DropdownList"
+            local isDropdown = dropdownButtons[target] or (target and target.Parent and target.Parent.Name == "DropdownList")
             if not isDropdown and not mainFrame:IsAncestorOf(target) then
                 closeAllDropdowns()
             end
@@ -612,6 +612,45 @@ function lib.Init(title, corner)
         end
     end)
 
+    local function showToast(title, description, duration)
+        local toastGui = Instance.new("ScreenGui")
+        toastGui.Name = "ToastGUI"
+        toastGui.ResetOnSpawn = false
+        toastGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+        local toastFrame = lib.makeRect(toastGui, Vector2.new(200, 50), UI_ELEMENT_COLOR, nil, 6)
+        toastFrame.Position = UDim2.new(0.5, -100, 1, -60)
+        toastFrame.BackgroundTransparency = 1
+
+        local titleLabel = lib.makeText(toastFrame, title, Vector2.new(200, 20), UI_ACCENT_COLOR, Enum.TextXAlignment.Left, 16)
+        titleLabel.Size = UDim2.new(1, -10, 0, 20)
+        titleLabel.Position = UDim2.new(0, 5, 0, 5)
+        
+        local descLabel = lib.makeText(toastFrame, description, Vector2.new(200, 15), UI_TEXT_COLOR, Enum.TextXAlignment.Left, 14)
+        descLabel.Size = UDim2.new(1, -10, 0, 15)
+        descLabel.Position = UDim2.new(0, 5, 0, 25)
+
+        local player = Players.LocalPlayer
+        if player then
+            toastGui.Parent = player:WaitForChild("PlayerGui", 5) or game:GetService("CoreGui")
+        else
+            toastGui.Parent = game:GetService("CoreGui") or game
+        end
+
+        local tweenInfoIn = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local tweenInfoOut = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, 0.5)
+
+        TweenService:Create(toastFrame, tweenInfoIn, {BackgroundTransparency = 0, Position = UDim2.new(0.5, -100, 1, -100)}):Play()
+
+        delay(duration or 3, function()
+            local fadeOut = TweenService:Create(toastFrame, tweenInfoOut, {BackgroundTransparency = 1, Position = UDim2.new(0.5, -100, 1, -60)})
+            fadeOut:Play()
+            fadeOut.Completed:Wait()
+            toastGui:Destroy()
+        end)
+    end
+    lib.showToast = showToast
+
 
     return {
         gui = gui, 
@@ -628,3 +667,73 @@ function lib.showToast(title, description, duration)
 end
 
 return lib
+
+local UI_LIBRARY_URL = "https://raw.githubusercontent.com/freakyfdp-py/simple-roblox-gui/refs/heads/main/ui.lua"
+local ui = nil
+local success_fetch, source_code = pcall(game.HttpGet, game, UI_LIBRARY_URL)
+
+if not success_fetch or type(source_code) ~= "string" then
+    return
+end
+
+local load_function = loadstring(source_code)
+
+if not load_function then
+    return
+end
+
+local success_exec, loaded_library = pcall(load_function)
+
+if success_exec and type(loaded_library) == "table" and loaded_library.Init then
+    ui = loaded_library
+else
+    return
+end
+
+local gui = ui.Init("Robust UI Example", 12)
+
+local tab1 = gui.createTab("Main Features")
+local tab2 = gui.createTab("Settings & Input")
+
+local moduleSection = tab1.createSection("Aimbot & ESP")
+
+local aimbotToggle = moduleSection.createToggle("Enable Aimbot", false, function(state)
+    print("Aimbot Toggled:", state)
+    gui.showToast("Aimbot Status", "Aimbot is now " .. (state and "ACTIVE" or "DISABLED"), 2)
+end, Enum.KeyCode.X, "Toggle")
+
+moduleSection.createButton("Execute Action", function()
+    print("Action executed.")
+    gui.showToast("Action", "Executed temporary action.", 1.5)
+end)
+
+moduleSection.createSeparator()
+
+local optionsList = {"Head", "Chest", "Legs", "Random"}
+local currentHitbox = moduleSection.createDropdown("Hitbox Selection", optionsList, "Head", function(selection)
+    print("Hitbox changed to:", selection)
+end)
+
+local fovSlider = moduleSection.createSlider("Aimbot Field of View", 10, 300, 90, function(value)
+    print("FOV set to:", value)
+end)
+
+local settingsSection = tab2.createSection("Configuration")
+
+local usernameInput = settingsSection.createTextInput("Target Name", "Player_123", function(text)
+    print("Target name set to:", text)
+end)
+
+settingsSection.createSeparator()
+
+settingsSection.createLabel("Current State:")
+
+settingsSection.createButton("Check Settings", function()
+    local hitbox = currentHitbox.getSelected()
+    local fov = fovSlider.getValue()
+    local target = usernameInput.getText()
+    
+    print(string.format("Hitbox: %s, FOV: %.1f, Target: %s", hitbox, fov, target))
+end)
+
+tab1.selectTab()
