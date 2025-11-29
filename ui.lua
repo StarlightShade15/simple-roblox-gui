@@ -87,6 +87,7 @@ function lib.Init(title, corner)
 
     local tabs = {}
     local keybinds = {}
+    local openDropdowns = {} -- Track open dropdowns
 
     local dragging, dragInput, dragStart, startPos = false
     header.InputBegan:Connect(function(input)
@@ -129,6 +130,15 @@ function lib.Init(title, corner)
             end
         end
     end
+    
+    local function closeAllDropdowns()
+        for i, listFrame in ipairs(openDropdowns) do
+            if listFrame and listFrame.Parent then
+                listFrame.Visible = false
+            end
+        end
+        openDropdowns = {}
+    end
 
     local visible = false
     mainFrame.BackgroundTransparency = 1
@@ -141,6 +151,10 @@ function lib.Init(title, corner)
         local tweenInfoIn = TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         local tweenInfoOut = TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
+        if not visible then
+            closeAllDropdowns() -- Close dropdowns when UI is closed
+        end
+        
         if visible then
             mainFrame.Visible = true
             TweenService:Create(mainFrame, tweenInfoIn, {BackgroundTransparency = 0}):Play()
@@ -264,6 +278,7 @@ function lib.Init(title, corner)
         end)
 
         local function selectTab()
+            closeAllDropdowns() -- Close dropdowns when changing tabs
             for k, v in pairs(tabs) do
                 v.frame.Visible = false
                 v.button.BackgroundColor3 = UI_ELEMENT_COLOR
@@ -529,17 +544,27 @@ function lib.Init(title, corner)
         })
         
         local function closeList()
-            listFrame.Visible = false
-            listOpen = false
+            if listOpen then
+                listFrame.Visible = false
+                listOpen = false
+                for i, list in ipairs(openDropdowns) do
+                    if list == listFrame then
+                        table.remove(openDropdowns, i)
+                        break
+                    end
+                end
+            end
         end
 
         local function openList()
+            closeAllDropdowns() -- Close other dropdowns
             local absPos = f.AbsolutePosition
             listFrame.Size = UDim2.new(0, f.AbsoluteSize.X, 0, math.min(#options * 25, 150))
             listFrame.Position = UDim2.new(0, absPos.X, 0, absPos.Y + f.AbsoluteSize.Y)
             listFrame.CanvasSize = UDim2.new(0, 0, 0, #options * 25)
             listFrame.Visible = true
             listOpen = true
+            table.insert(openDropdowns, listFrame)
         end
         
         f.InputBegan:Connect(function(input)
@@ -551,10 +576,28 @@ function lib.Init(title, corner)
                 end
             end
         end)
-
+        
+        -- FIX: Use AbsolutePosition check instead of input.Target to avoid CorePackage error
         UserInputService.InputBegan:Connect(function(input)
-            if listOpen and input.UserInputType == Enum.UserInputType.MouseButton1 and not input.Target:IsDescendantOf(listFrame) and not input.Target:IsDescendantOf(f) then
-                closeList()
+            if listOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
+                local pos = input.Position
+                
+                local frameAbsPos = f.AbsolutePosition
+                local frameAbsSize = f.AbsoluteSize
+                
+                local listAbsPos = listFrame.AbsolutePosition
+                local listAbsSize = listFrame.AbsoluteSize
+
+                -- Check if click is outside both the button and the list
+                local clickedOutsideButton = (pos.X < frameAbsPos.X or pos.X > frameAbsPos.X + frameAbsSize.X or
+                                              pos.Y < frameAbsPos.Y or pos.Y > frameAbsPos.Y + frameAbsSize.Y)
+                
+                local clickedOutsideList = (pos.X < listAbsPos.X or pos.X > listAbsPos.X + listAbsSize.X or
+                                            pos.Y < listAbsPos.Y or pos.Y > listAbsPos.Y + listAbsSize.Y)
+                
+                if clickedOutsideButton and clickedOutsideList then
+                    closeList()
+                end
             end
         end)
         
