@@ -88,6 +88,7 @@ function lib.Init(title, corner)
     local tabs = {}
     local keybinds = {}
     local openDropdowns = {}
+    local dropdownButtons = {} -- New: Track the button that opens the dropdown
 
     local dragging, dragInput, dragStart, startPos = false
     header.InputBegan:Connect(function(input)
@@ -174,6 +175,36 @@ function lib.Init(title, corner)
     UserInputService.InputBegan:Connect(function(input, processed)
         if not processed and input.KeyCode == Enum.KeyCode.F5 then
             toggleUI()
+        end
+    end)
+
+    -- NEW APPROACH: Click handler on the main GUI to close dropdowns safely
+    gui.MouseButton1Click:Connect(function(x, y, target)
+        if mainFrame.Visible and #openDropdowns > 0 then
+            local isInsideDropdown = false
+            
+            -- Check if the click target or any of its ancestors is an open dropdown element
+            local element = target
+            while element and element ~= gui do
+                if element.Name == "DropdownList" then
+                    isInsideDropdown = true
+                    break
+                end
+                -- Also check if it's the dropdown button itself
+                for _, button in pairs(dropdownButtons) do
+                    if element == button then
+                        isInsideDropdown = true
+                        break
+                    end
+                end
+                if isInsideDropdown then break end
+                element = element.Parent
+            end
+
+            -- If the click was outside any open dropdown list or its button, close them
+            if not isInsideDropdown then
+                closeAllDropdowns()
+            end
         end
     end)
 
@@ -509,6 +540,9 @@ function lib.Init(title, corner)
         local frameHeight = 30
         local f = lib.makeRect(section.content, Vector2.new(0, frameHeight), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
         f.Size = UDim2.new(1, 0, 0, frameHeight)
+        
+        -- Store button reference for the new closing logic
+        dropdownButtons[f] = f
 
         local currentOption = default
         
@@ -570,37 +604,15 @@ function lib.Init(title, corner)
         f.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 if listOpen then
-                    closeList()
+                    -- Do nothing here, let the MouseButton1Click on the item/gui close it
                 else
                     openList()
                 end
             end
         end)
         
-        -- FIX: Use AbsolutePosition check to avoid 'Target is not a valid member' crash
-        UserInputService.InputBegan:Connect(function(input)
-            if listOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
-                local pos = input.Position
-                
-                local frameAbsPos = f.AbsolutePosition
-                local frameAbsSize = f.AbsoluteSize
-                
-                local listAbsPos = listFrame.AbsolutePosition
-                local listAbsSize = listFrame.AbsoluteSize
+        -- The MouseButton1Click event on the GUI (gui.MouseButton1Click) handles clicks outside the dropdown.
 
-                -- Check if click is outside both the button and the list
-                local clickedOutsideButton = (pos.X < frameAbsPos.X or pos.X > frameAbsPos.X + frameAbsSize.X or
-                                              pos.Y < frameAbsPos.Y or pos.Y > frameAbsPos.Y + frameAbsSize.Y)
-                
-                local clickedOutsideList = (pos.X < listAbsPos.X or pos.X > listAbsPos.X + listAbsSize.X or
-                                            pos.Y < listAbsPos.Y or pos.Y > listAbsPos.Y + listAbsSize.Y)
-                
-                if clickedOutsideButton and clickedOutsideList then
-                    closeList()
-                end
-            end
-        end)
-        
         for i, option in ipairs(options) do
             local item = Instance.new("TextButton")
             c(item, {
