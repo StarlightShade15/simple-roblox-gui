@@ -51,13 +51,13 @@ function lib.makeRect(parent, size, bg, stroke, corner)
     return f
 end
 
-local function addLabel(section, text)
+local function createLabel(section, text)
     local l = lib.makeText(section.content, text, Vector2.new(0, 25), UI_TEXT_COLOR, Enum.TextXAlignment.Left, 14)
     l.Size = UDim2.new(1, 0, 0, 25)
     return l
 end
 
-local function addSeparator(section)
+local function createSeparator(section)
     local s = lib.makeRect(section.content, Vector2.new(0, 2), UI_ELEMENT_COLOR, nil, 0)
     s.Size = UDim2.new(1, 0, 0, 2)
     local spacer = lib.makeRect(section.content, Vector2.new(0, 4), Color3.new(1,1,1), nil, 0)
@@ -66,7 +66,7 @@ local function addSeparator(section)
     return s
 end
 
-local function addButton(section, text, callback, keybind, keybinds)
+local function createButton(section, text, callback, keybind, keybinds)
     local b = lib.makeRect(section.content, Vector2.new(0, 30), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
     b.Size = UDim2.new(1, 0, 0, 30)
 
@@ -83,7 +83,7 @@ local function addButton(section, text, callback, keybind, keybinds)
     return b
 end
 
-local function addToggle(section, text, default, callback, keybind, mode, keybinds)
+local function createToggle(section, text, default, callback, keybind, mode, keybinds)
     local f = lib.makeRect(section.content, Vector2.new(0, 30), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
     f.Size = UDim2.new(1, 0, 0, 30)
 
@@ -146,7 +146,7 @@ local function addToggle(section, text, default, callback, keybind, mode, keybin
     }
 end
 
-local function addSlider(section, text, min, max, default, callback)
+local function createSlider(section, text, min, max, default, callback)
     local frameHeight = 40
     local f = lib.makeRect(section.content, Vector2.new(0, frameHeight), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
     f.Size = UDim2.new(1, 0, 0, frameHeight)
@@ -236,7 +236,7 @@ local function addSlider(section, text, min, max, default, callback)
     }
 end
 
-local function addDropdown(section, text, options, default, callback, openDropdowns, dropdownButtons, gui)
+local function createDropdown(section, text, options, default, callback, openDropdowns, dropdownButtons, gui)
     local frameHeight = 30
     local f = lib.makeRect(section.content, Vector2.new(0, frameHeight), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
     f.Size = UDim2.new(1, 0, 0, frameHeight)
@@ -289,7 +289,7 @@ local function addDropdown(section, text, options, default, callback, openDropdo
     end
 
     local function openList()
-        local function closeAllDropdowns() -- Nested helper function to close others
+        local function closeAllDropdowns()
             for i, listFrame in ipairs(openDropdowns) do
                 if listFrame and listFrame.Parent and listFrame.Visible then
                     listFrame.Visible = false
@@ -352,7 +352,7 @@ local function addDropdown(section, text, options, default, callback, openDropdo
     }
 end
 
-local function addTextInput(section, text, default, callback)
+local function createTextInput(section, text, default, callback)
     local frameHeight = 30
     local f = lib.makeRect(section.content, Vector2.new(0, frameHeight), UI_ELEMENT_COLOR, nil, CORNER_RADIUS)
     f.Size = UDim2.new(1, 0, 0, frameHeight)
@@ -391,7 +391,6 @@ local function addTextInput(section, text, default, callback)
         set = function(newText) currentText = newText; input.Text = newText end
     }
 end
-
 
 function lib.Init(title, corner)
     local gui = Instance.new("ScreenGui")
@@ -484,17 +483,16 @@ function lib.Init(title, corner)
 
         section.Parent = tab.frame
         
-        -- The core change: section methods are defined here!
         local sectionObject = {
             frame = section, 
             content = secContent,
-            addLabel = function(self, text) return addLabel(self, text) end,
-            addSeparator = function(self) return addSeparator(self) end,
-            addButton = function(self, text, callback, keybind) return addButton(self, text, callback, keybind, keybinds) end,
-            addToggle = function(self, text, default, callback, keybind, mode) return addToggle(self, text, default, callback, keybind, mode, keybinds) end,
-            addSlider = function(self, text, min, max, default, callback) return addSlider(self, text, min, max, default, callback) end,
-            addDropdown = function(self, text, options, default, callback) return addDropdown(self, text, options, default, callback, openDropdowns, dropdownButtons, gui) end,
-            addTextInput = function(self, text, default, callback) return addTextInput(self, text, default, callback) end,
+            createLabel = function(self, text) return createLabel(self, text) end,
+            createSeparator = function(self) return createSeparator(self) end,
+            createButton = function(self, text, callback, keybind) return createButton(self, text, callback, keybind, keybinds) end,
+            createToggle = function(self, text, default, callback, keybind, mode) return createToggle(self, text, default, callback, keybind, mode, keybinds) end,
+            createSlider = function(self, text, min, max, default, callback) return createSlider(self, text, min, max, default, callback) end,
+            createDropdown = function(self, text, options, default, callback) return createDropdown(self, text, options, default, callback, openDropdowns, dropdownButtons, gui) end,
+            createTextInput = function(self, text, default, callback) return createTextInput(self, text, default, callback) end,
         }
         
         tab.sections[sectionName] = sectionObject
@@ -533,22 +531,18 @@ function lib.Init(title, corner)
 
         btn.MouseButton1Click:Connect(selectTab)
 
-        -- The core change: tab methods are defined here!
         local tabObject = {
             button = btn, 
             frame = tabFrame, 
             sections = {}, 
             selectTab = selectTab,
-            createSection = function(self, name) return createSection(self, name) end -- Attach method to tab
+            createSection = function(self, name) return createSection(self, name) end 
         }
 
         tabs[tabName] = tabObject
         return tabObject
     end
 
-    -- ... (Skipping dragging and toggleUI logic, which is unchanged) ...
-
-    -- Dragging and visibility logic from previous scripts should be here
     local dragging, dragInput, dragStart, startPos = false
     header.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 and not dragInput then
@@ -571,6 +565,16 @@ function lib.Init(title, corner)
         end
     end)
     
+    UserInputService.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local target = input.Target
+            local isDropdown = dropdownButtons[target] or target.Parent.Name == "DropdownList"
+            if not isDropdown and not mainFrame:IsAncestorOf(target) then
+                closeAllDropdowns()
+            end
+        end
+    end)
+
     local visible = false
     mainFrame.BackgroundTransparency = 1
     mainFrame.Visible = false
@@ -585,7 +589,6 @@ function lib.Init(title, corner)
         if visible then
             mainFrame.Visible = true
             TweenService:Create(mainFrame, tweenInfoIn, {BackgroundTransparency = 0}):Play()
-            -- (Assuming tweenChildrenTransparency exists or use other method)
         else
             local fadeOut = TweenService:Create(mainFrame, tweenInfoOut, {BackgroundTransparency = 1})
             fadeOut:Play()
@@ -593,14 +596,10 @@ function lib.Init(title, corner)
             mainFrame.Visible = false
         end
     end
+    
     UserInputService.InputBegan:Connect(function(input, processed)
         if not processed and input.KeyCode == Enum.KeyCode.F5 then toggleUI() end
     end)
-    -- Dropdown closing logic (using InputEnded) from previous scripts should be here
-
-    -- Toast logic from previous scripts should be here (lib.showToast needs to be available)
-
-    -- Keybinds handling is at the bottom of the original lib.Init
 
     UserInputService.InputBegan:Connect(function(input, processed)
         if input.UserInputType.Name:find("Key") and not processed and keybinds[input.KeyCode] then 
@@ -615,17 +614,17 @@ function lib.Init(title, corner)
 
 
     return {
-        gui = gui, frame = mainFrame, tabBar = tabBar, tabContainer = tabContainer,
+        gui = gui, 
+        frame = mainFrame, 
+        tabBar = tabBar, 
+        tabContainer = tabContainer,
         createTab = createTab, 
-        -- createSection is removed from here as it's now a method of the tab object
-        showToast = lib.showToast
-        -- Other utility functions (showToast is a placeholder here)
+        showToast = lib.showToast 
     }
 end
 
--- lib.showToast function defined outside lib.Init (assuming from previous code)
 function lib.showToast(title, description, duration)
-    -- ... (The full toast function body goes here) ...
+    
 end
 
 return lib
