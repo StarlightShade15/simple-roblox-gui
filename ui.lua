@@ -1,214 +1,251 @@
 local mod = {}
 
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local player = game.Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 local isVisible = true
 local toggleKey = Enum.KeyCode.RightShift
-local themeColor = Color3.fromRGB(110, 40, 180) 
+local accentColor = Color3.fromRGB(110, 40, 180)
+local isDarkMode = true
 
 local function makeDraggable(frame)
-	local dragging, dragInput, dragStart, startPos
-	frame.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true; dragStart = input.Position; startPos = frame.Position
-		end
-	end)
-	UserInputService.InputChanged:Connect(function(input)
-		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-			local delta = input.Position - dragStart
-			frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-		end
-	end)
-	UserInputService.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
-	end)
+    local dragging, dragInput, dragStart, startPos
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true; dragStart = input.Position; startPos = frame.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+    end)
 end
 
 function mod.init(title)
-	local sg = Instance.new("ScreenGui", playerGui)
-	sg.Name = title
-	sg.ResetOnSpawn = false
-	
-	local main = Instance.new("Frame", sg)
-	main.Size = UDim2.new(0, 500, 0, 350)
-	main.Position = UDim2.new(0.5, -250, 0.5, -175)
-	main.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-	main.BorderSizePixel = 0
-	makeDraggable(main)
-	Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
-	
-	local themeToggle = Instance.new("TextButton", main)
-	themeToggle.Size = UDim2.new(0, 24, 0, 24)
-	themeToggle.Position = UDim2.new(0, 10, 0, 8)
-	themeToggle.BackgroundColor3 = themeColor
-	themeToggle.Text = "+"
-	themeToggle.TextColor3 = Color3.new(1,1,1)
-	themeToggle.Font = Enum.Font.GothamBold
-	themeToggle.TextSize = 18
-	Instance.new("UICorner", themeToggle).CornerRadius = UDim.new(1, 0)
+    local sg = Instance.new("ScreenGui", playerGui)
+    sg.Name = title
+    sg.ResetOnSpawn = false
+    
+    local main = Instance.new("Frame", sg)
+    main.Size = UDim2.new(0, 500, 0, 350)
+    main.Position = UDim2.new(0.5, -250, 0.5, -175)
+    main.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    main.BorderSizePixel = 0
+    makeDraggable(main)
+    Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+    
+    -- Theme Panel (Hidden by default)
+    local themePanel = Instance.new("Frame", main)
+    themePanel.Size = UDim2.new(0, 0, 1, -20)
+    themePanel.Position = UDim2.new(0, 5, 0, 10)
+    themePanel.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    themePanel.BorderSizePixel = 0
+    themePanel.ClipsDescendants = true
+    themePanel.ZIndex = 5
+    Instance.new("UICorner", themePanel)
+    
+    local themeLayout = Instance.new("UIListLayout", themePanel)
+    themeLayout.Padding = UDim.new(0, 10)
+    themeLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    
+    -- Theme Toggle (+)
+    local themeBtn = Instance.new("TextButton", main)
+    themeBtn.Size = UDim2.new(0, 25, 0, 25)
+    themeBtn.Position = UDim2.new(0, 10, 0, 8)
+    themeBtn.BackgroundColor3 = accentColor
+    themeBtn.Text = "+"
+    themeBtn.TextColor3 = Color3.new(1,1,1)
+    themeBtn.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", themeBtn).CornerRadius = UDim.new(1, 0)
 
-	local sidebar = Instance.new("Frame", main)
-	sidebar.Size = UDim2.new(0, 130, 1, -50)
-	sidebar.Position = UDim2.new(0, 10, 0, 45)
-	sidebar.BackgroundTransparency = 1
-	Instance.new("UIListLayout", sidebar).Padding = UDim.new(0, 6)
-	
-	local container = Instance.new("Frame", main)
-	container.Size = UDim2.new(1, -160, 1, -50)
-	container.Position = UDim2.new(0, 150, 0, 45)
-	container.BackgroundTransparency = 1
+    local sidebar = Instance.new("Frame", main)
+    sidebar.Size = UDim2.new(0, 130, 1, -50)
+    sidebar.Position = UDim2.new(0, 10, 0, 45)
+    sidebar.BackgroundTransparency = 1
+    Instance.new("UIListLayout", sidebar).Padding = UDim.new(0, 6)
+    
+    local container = Instance.new("Frame", main)
+    container.Size = UDim2.new(1, -160, 1, -50)
+    container.Position = UDim2.new(0, 150, 0, 45)
+    container.BackgroundTransparency = 1
 
-	local uiState = {main = main, sidebar = sidebar, container = container, sg = sg}
+    local uiState = {main = main, sidebar = sidebar, container = container, sg = sg, themePanel = themePanel}
 
-	local settings = mod.addTab(uiState, "Settings")
-	mod.addSection(settings, "Menu Controls")
-	
-	mod.addButton(settings, "Toggle Key: [" .. toggleKey.Name .. "]", function(btn)
-		btn.Text = "..."
-		local connection
-		connection = UserInputService.InputBegan:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.Keyboard then
-				toggleKey = input.KeyCode
-				btn.Text = "Toggle Key: [" .. toggleKey.Name .. "]"
-				connection:Disconnect()
-			end
-		end)
-	end)
+    -- Theme Logic
+    local themeOpen = false
+    themeBtn.MouseButton1Click:Connect(function()
+        themeOpen = not themeOpen
+        local targetSize = themeOpen and UDim2.new(0, 140, 1, -20) or UDim2.new(0, 0, 1, -20)
+        TweenService:Create(themePanel, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {Size = targetSize}):Play()
+        themeBtn.Text = themeOpen and "-" or "+"
+    end)
 
-	mod.addButton(settings, "Destroy Menu", function() sg:Destroy() end)
+    -- Build Theme Options
+    mod.addSection(themePanel, "Theme")
+    mod.addButton(themePanel, "Toggle Mode", function()
+        isDarkMode = not isDarkMode
+        main.BackgroundColor3 = isDarkMode and Color3.fromRGB(20, 20, 25) or Color3.fromRGB(240, 240, 245)
+        themePanel.BackgroundColor3 = isDarkMode and Color3.fromRGB(30, 30, 35) or Color3.fromRGB(220, 220, 225)
+    end)
+    
+    local colors = {Color3.fromRGB(110, 40, 180), Color3.fromRGB(255, 60, 60), Color3.fromRGB(60, 180, 255), Color3.fromRGB(60, 255, 120)}
+    for _, color in pairs(colors) do
+        local cBtn = Instance.new("TextButton", themePanel)
+        cBtn.Size = UDim2.new(0, 30, 0, 30)
+        cBtn.BackgroundColor3 = color
+        cBtn.Text = ""
+        Instance.new("UICorner", cBtn).CornerRadius = UDim.new(1, 0)
+        cBtn.MouseButton1Click:Connect(function()
+            accentColor = color
+            themeBtn.BackgroundColor3 = color
+        end)
+    end
 
-	themeToggle.MouseButton1Click:Connect(function()
-		local colors = {Color3.fromRGB(110, 40, 180), Color3.fromRGB(200, 50, 50), Color3.fromRGB(50, 200, 100), Color3.fromRGB(50, 100, 200)}
-		themeColor = colors[math.random(1, #colors)]
-		themeToggle.BackgroundColor3 = themeColor
-	end)
+    -- Default Settings Tab
+    local settings = mod.addTab(uiState, "Settings")
+    mod.addButton(settings, "Unload UI", function() sg:Destroy() end)
 
-	UserInputService.InputBegan:Connect(function(input, gpe)
-		if not gpe and input.KeyCode == toggleKey then
-			isVisible = not isVisible
-			main.Visible = isVisible
-		end
-	end)
+    UserInputService.InputBegan:Connect(function(input, gpe)
+        if not gpe and input.KeyCode == toggleKey then
+            isVisible = not isVisible
+            main.Visible = isVisible
+        end
+    end)
 
-	return uiState
+    return uiState
 end
 
 function mod.addTab(ui, name)
-	local tabBtn = Instance.new("TextButton", ui.sidebar)
-	tabBtn.Size = UDim2.new(1, 0, 0, 32)
-	tabBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-	tabBtn.Text = name
-	tabBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-	tabBtn.Font = Enum.Font.GothamMedium
-	tabBtn.TextSize = 13
-	Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 6)
-	
-	local page = Instance.new("ScrollingFrame", ui.container)
-	page.Size = UDim2.new(1, 0, 1, 0)
-	page.BackgroundTransparency = 1
-	page.Visible = (name == "Settings")
-	page.ScrollBarThickness = 2
-	page.ScrollBarImageColor3 = themeColor
-	page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	Instance.new("UIListLayout", page).Padding = UDim.new(0, 10)
-	
-	tabBtn.MouseButton1Click:Connect(function()
-		for _, v in pairs(ui.container:GetChildren()) do
-			if v:IsA("ScrollingFrame") then v.Visible = false end
-		end
-		page.Visible = true
-	end)
-	return page
+    local tabBtn = Instance.new("TextButton", ui.sidebar)
+    tabBtn.Size = UDim2.new(1, 0, 0, 32)
+    tabBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    tabBtn.Text = name
+    tabBtn.TextColor3 = Color3.new(1,1,1)
+    tabBtn.Font = Enum.Font.Gotham
+    Instance.new("UICorner", tabBtn)
+    
+    local page = Instance.new("ScrollingFrame", ui.container)
+    page.Size = UDim2.new(1, 0, 1, 0)
+    page.BackgroundTransparency = 1
+    page.Visible = false
+    page.ScrollBarThickness = 0
+    Instance.new("UIListLayout", page).Padding = UDim.new(0, 10)
+    
+    tabBtn.MouseButton1Click:Connect(function()
+        for _, v in pairs(ui.container:GetChildren()) do v.Visible = false end
+        page.Visible = true
+    end)
+    if name == "Settings" then page.Visible = true end
+    return page
 end
 
 function mod.addSection(parent, text)
-	local label = Instance.new("TextLabel", parent)
-	label.Size = UDim2.new(1, 0, 0, 20)
-	label.Text = "  " .. text:upper()
-	label.TextColor3 = Color3.fromRGB(120, 120, 140)
-	label.Font = Enum.Font.GothamBold
-	label.TextSize = 10
-	label.BackgroundTransparency = 1
-	label.TextXAlignment = Enum.TextXAlignment.Left
+    local label = Instance.new("TextLabel", parent)
+    label.Size = UDim2.new(1, 0, 0, 25)
+    label.Text = text:upper()
+    label.TextColor3 = Color3.fromRGB(150, 150, 160)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 10
+    label.BackgroundTransparency = 1
 end
 
 function mod.addButton(parent, text, callback)
-	local btn = Instance.new("TextButton", parent)
-	btn.Size = UDim2.new(1, -10, 0, 35)
-	btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-	btn.Text = text
-	btn.TextColor3 = Color3.new(1, 1, 1)
-	btn.Font = Enum.Font.Gotham
-	btn.TextSize = 13
-	Instance.new("UICorner", btn)
-	btn.MouseButton1Click:Connect(function() callback(btn) end)
-	return btn
+    local btn = Instance.new("TextButton", parent)
+    btn.Size = UDim2.new(1, -10, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.Gotham
+    Instance.new("UICorner", btn)
+    btn.MouseButton1Click:Connect(callback)
+    return btn
 end
 
--- FIXED DROPDOWN
+function mod.addSlider(parent, text, min, max, default, callback)
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1, -10, 0, 45)
+    frame.BackgroundTransparency = 1
+    local label = Instance.new("TextLabel", frame)
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.Text = text .. ": " .. default
+    label.TextColor3 = Color3.new(1,1,1)
+    label.BackgroundTransparency = 1
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local bar = Instance.new("Frame", frame)
+    bar.Size = UDim2.new(1, 0, 0, 5)
+    bar.Position = UDim2.new(0, 0, 0.7, 0)
+    bar.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+    local fill = Instance.new("Frame", bar)
+    fill.Size = UDim2.new((default-min)/(max-min), 0, 1, 0)
+    fill.BackgroundColor3 = accentColor
+    
+    bar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local move = UserInputService.InputChanged:Connect(function(m)
+                if m.UserInputType == Enum.UserInputType.MouseMovement then
+                    local percent = math.clamp((m.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+                    fill.Size = UDim2.new(percent, 0, 1, 0)
+                    local val = math.floor(min + (max-min)*percent)
+                    label.Text = text .. ": " .. val
+                    callback(val)
+                end
+            end)
+            UserInputService.InputEnded:Connect(function(e) if e.UserInputType == Enum.UserInputType.MouseButton1 then move:Disconnect() end end)
+        end
+    end)
+end
+
+function mod.addInput(parent, placeholder, callback)
+    local box = Instance.new("TextBox", parent)
+    box.Size = UDim2.new(1, -10, 0, 35)
+    box.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    box.PlaceholderText = placeholder
+    box.Text = ""
+    box.TextColor3 = Color3.new(1,1,1)
+    Instance.new("UICorner", box)
+    box.FocusLost:Connect(function(enter) if enter then callback(box.Text) end end)
+end
+
 function mod.addDropdown(parent, text, options, callback)
-	local expanded = false
-	local frame = Instance.new("Frame", parent)
-	frame.Size = UDim2.new(1, -10, 0, 35)
-	frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-	frame.ClipsDescendants = true
-	Instance.new("UICorner", frame)
-	
-	local btn = Instance.new("TextButton", frame)
-	btn.Size = UDim2.new(1, 0, 0, 35)
-	btn.BackgroundTransparency = 1
-	btn.Text = "  " .. text .. " ▼"
-	btn.TextColor3 = Color3.new(1,1,1)
-	btn.Font = Enum.Font.Gotham
-	btn.TextXAlignment = Enum.TextXAlignment.Left
-	
-	btn.MouseButton1Click:Connect(function()
-		expanded = not expanded
-		frame.Size = expanded and UDim2.new(1, -10, 0, (#options * 30) + 40) or UDim2.new(1, -10, 0, 35)
-	end)
-	
-	for i, v in ipairs(options) do
-		local opt = Instance.new("TextButton", frame)
-		opt.Size = UDim2.new(1, 0, 0, 30)
-		opt.Position = UDim2.new(0, 0, 0, (i * 30) + 5)
-		opt.BackgroundTransparency = 1
-		opt.Text = tostring(v)
-		opt.TextColor3 = Color3.fromRGB(180, 180, 180)
-		opt.Font = Enum.Font.Gotham
-		opt.MouseButton1Click:Connect(function()
-			btn.Text = "  " .. text .. ": " .. tostring(v)
-			expanded = false
-			frame.Size = UDim2.new(1, -10, 0, 35)
-			callback(v)
-		end)
-	end
-end
-
--- ADDED TOGGLE (SWITCH)
-function mod.addToggle(parent, text, default, callback)
-	local state = default or false
-	local btn = Instance.new("TextButton", parent)
-	btn.Size = UDim2.new(1, -10, 0, 35)
-	btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-	btn.Text = "  " .. text
-	btn.TextColor3 = Color3.new(1,1,1)
-	btn.Font = Enum.Font.Gotham
-	btn.TextXAlignment = Enum.TextXAlignment.Left
-	Instance.new("UICorner", btn)
-
-	local box = Instance.new("Frame", btn)
-	box.Size = UDim2.new(0, 20, 0, 20)
-	box.Position = UDim2.new(1, -30, 0.5, -10)
-	box.BackgroundColor3 = state and themeColor or Color3.fromRGB(50, 50, 60)
-	Instance.new("UICorner", box)
-
-	btn.MouseButton1Click:Connect(function()
-		state = not state
-		box.BackgroundColor3 = state and themeColor or Color3.fromRGB(50, 50, 60)
-		callback(state)
-	end)
+    local expanded = false
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1, -10, 0, 35)
+    frame.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    frame.ClipsDescendants = true
+    Instance.new("UICorner", frame)
+    
+    local btn = Instance.new("TextButton", frame)
+    btn.Size = UDim2.new(1, 0, 0, 35)
+    btn.BackgroundTransparency = 1
+    btn.Text = text .. " ▼"
+    btn.TextColor3 = Color3.new(1,1,1)
+    
+    btn.MouseButton1Click:Connect(function()
+        expanded = not expanded
+        frame.Size = expanded and UDim2.new(1, -10, 0, (#options * 30) + 40) or UDim2.new(1, -10, 0, 35)
+    end)
+    
+    for i, optName in pairs(options) do
+        local opt = Instance.new("TextButton", frame)
+        opt.Size = UDim2.new(1, 0, 0, 30)
+        opt.Position = UDim2.new(0, 0, 0, (i*30)+5)
+        opt.BackgroundTransparency = 1
+        opt.Text = optName
+        opt.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+        opt.MouseButton1Click:Connect(function()
+            callback(optName)
+            expanded = false
+            frame.Size = UDim2.new(1, -10, 0, 35)
+        end)
+    end
 end
 
 return mod
