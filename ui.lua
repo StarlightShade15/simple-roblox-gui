@@ -10,7 +10,6 @@ local toggleKey = Enum.KeyCode.RightShift
 local accentColor = Color3.fromRGB(110, 40, 180)
 
 local currentSettings = {}
-local globalOrder = 0
 
 local function makeDraggable(frame, dragHandle)
     local dragging, dragStart, startPos
@@ -99,11 +98,11 @@ function mod.init(titleText)
         page.BackgroundTransparency = 1
         page.ScrollBarThickness = 4
         page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        page.CanvasSize = UDim2.new(0, 0, 0, 0)
 
         local layout = Instance.new("UIListLayout", page)
         layout.Padding = UDim.new(0, 12)
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
 
         tabBtn.MouseButton1Click:Connect(function()
             for _, v in pairs(self.container:GetChildren()) do
@@ -115,9 +114,10 @@ function mod.init(titleText)
         end)
 
         local tabObj = {}
+        local order = 0
 
         function tabObj:addSection(text)
-            globalOrder += 1
+            order += 1
             local label = Instance.new("TextLabel", page)
             label.Size = UDim2.new(1, -10, 0, 30)
             label.Text = "  " .. text:upper()
@@ -126,16 +126,16 @@ function mod.init(titleText)
             label.TextSize = 13
             label.BackgroundTransparency = 1
             label.TextXAlignment = Enum.TextXAlignment.Left
-            label.LayoutOrder = globalOrder
+            label.LayoutOrder = order
         end
 
         function tabObj:addSlider(text, min, max, default, callback)
-            globalOrder += 1
+            order += 1
 
             local frame = Instance.new("Frame", page)
             frame.Size = UDim2.new(1, -10, 0, 70)
             frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-            frame.LayoutOrder = globalOrder
+            frame.LayoutOrder = order
             Instance.new("UICorner", frame)
 
             local label = Instance.new("TextLabel", frame)
@@ -161,50 +161,49 @@ function mod.init(titleText)
             Instance.new("UICorner", fill)
 
             currentSettings[text] = default
-
             local dragging = false
 
-            local function setValueFromX(x)
-                local percent = math.clamp((x - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
-                local value = math.floor(min + (max - min) * percent)
-                fill.Size = UDim2.new(percent, 0, 1, 0)
-                label.Text = text .. ": " .. value
-                currentSettings[text] = value
-                callback(value)
+            local function setFromX(x)
+                local p = math.clamp((x - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+                local v = math.floor(min + (max - min) * p)
+                fill.Size = UDim2.new(p, 0, 1, 0)
+                label.Text = text .. ": " .. v
+                currentSettings[text] = v
+                callback(v)
             end
 
-            bar.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            bar.InputBegan:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseButton1 then
                     dragging = true
-                    setValueFromX(input.Position.X)
+                    setFromX(i.Position.X)
                 end
             end)
 
-            UserInputService.InputChanged:Connect(function(input)
-                if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                    setValueFromX(input.Position.X)
+            UserInputService.InputChanged:Connect(function(i)
+                if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
+                    setFromX(i.Position.X)
                 end
             end)
 
-            UserInputService.InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            UserInputService.InputEnded:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseButton1 then
                     dragging = false
                 end
             end)
 
-            function tabObj:updateSlider(targetText, newVal)
-                if targetText == text then
-                    local p = math.clamp((newVal - min) / (max - min), 0, 1)
+            function tabObj:updateSlider(target, val)
+                if target == text then
+                    local p = math.clamp((val - min) / (max - min), 0, 1)
                     fill.Size = UDim2.new(p, 0, 1, 0)
-                    label.Text = text .. ": " .. newVal
-                    currentSettings[text] = newVal
-                    callback(newVal)
+                    label.Text = text .. ": " .. val
+                    currentSettings[text] = val
+                    callback(val)
                 end
             end
         end
 
         function tabObj:addButton(text, callback)
-            globalOrder += 1
+            order += 1
             local btn = Instance.new("TextButton", page)
             btn.Size = UDim2.new(1, -10, 0, 42)
             btn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
@@ -212,13 +211,13 @@ function mod.init(titleText)
             btn.TextColor3 = Color3.new(1, 1, 1)
             btn.Font = Enum.Font.GothamMedium
             btn.TextSize = 15
-            btn.LayoutOrder = globalOrder
+            btn.LayoutOrder = order
             Instance.new("UICorner", btn)
             btn.MouseButton1Click:Connect(callback)
         end
 
         function tabObj:addInput(placeholder, callback)
-            globalOrder += 1
+            order += 1
             local box = Instance.new("TextBox", page)
             box.Size = UDim2.new(1, -10, 0, 42)
             box.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
@@ -228,12 +227,10 @@ function mod.init(titleText)
             box.TextColor3 = Color3.new(1, 1, 1)
             box.Font = Enum.Font.GothamMedium
             box.TextSize = 15
-            box.LayoutOrder = globalOrder
+            box.LayoutOrder = order
             Instance.new("UICorner", box)
-            box.FocusLost:Connect(function(enter)
-                if enter then
-                    callback(box.Text)
-                end
+            box.FocusLost:Connect(function(e)
+                if e then callback(box.Text) end
             end)
             return box
         end
