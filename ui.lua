@@ -9,9 +9,6 @@ local isVisible = true
 local toggleKey = Enum.KeyCode.RightShift
 local accentColor = Color3.fromRGB(110, 40, 180)
 
--- Global state for config data
-local currentSettings = {}
-
 local function makeDraggable(frame, dragHandle)
     local dragging, dragStart, startPos
     dragHandle.InputBegan:Connect(function(input)
@@ -42,14 +39,14 @@ function mod.init(titleText)
     main.BorderSizePixel = 0
     Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
 
-    -- THE TITLE BAR (Dragging Handle)
+    -- Title Bar
     local titleBar = Instance.new("Frame", main)
     titleBar.Size = UDim2.new(1, 0, 0, 45)
     titleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     titleBar.BorderSizePixel = 0
     local titleCorner = Instance.new("UICorner", titleBar)
     titleCorner.CornerRadius = UDim.new(0, 12)
-    -- Hide bottom corners of title bar
+    
     local overlap = Instance.new("Frame", titleBar)
     overlap.Size = UDim2.new(1, 0, 0.5, 0)
     overlap.Position = UDim2.new(0, 0, 0.5, 0)
@@ -80,6 +77,7 @@ function mod.init(titleText)
     container.BackgroundTransparency = 1
 
     local menu = {sidebar = sidebar, container = container}
+    local currentSettings = {}
 
     function menu:addTab(name)
         local tabBtn = Instance.new("TextButton", self.sidebar)
@@ -98,9 +96,12 @@ function mod.init(titleText)
         page.ScrollBarThickness = 2
         page.AutomaticCanvasSize = Enum.AutomaticSize.Y
         page.CanvasSize = UDim2.new(0,0,0,0)
+        
         local layout = Instance.new("UIListLayout", page)
         layout.Padding = UDim.new(0, 12)
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        -- CRITICAL FIX: Sort by LayoutOrder
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
         
         tabBtn.MouseButton1Click:Connect(function()
             for _, v in pairs(self.container:GetChildren()) do
@@ -109,9 +110,10 @@ function mod.init(titleText)
             page.Visible = true
         end)
 
-        local tabObj = {}
+        local tabObj = { elementCount = 0 }
 
         function tabObj:addSection(text)
+            self.elementCount = self.elementCount + 1
             local label = Instance.new("TextLabel", page)
             label.Size = UDim2.new(1, -10, 0, 30)
             label.Text = "  " .. text:upper()
@@ -120,9 +122,11 @@ function mod.init(titleText)
             label.TextSize = 13
             label.BackgroundTransparency = 1
             label.TextXAlignment = Enum.TextXAlignment.Left
+            label.LayoutOrder = self.elementCount -- Fixes order
         end
 
         function tabObj:addButton(text, callback)
+            self.elementCount = self.elementCount + 1
             local btn = Instance.new("TextButton", page)
             btn.Size = UDim2.new(1, -10, 0, 42)
             btn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
@@ -130,14 +134,17 @@ function mod.init(titleText)
             btn.TextColor3 = Color3.new(1, 1, 1)
             btn.Font = Enum.Font.GothamMedium
             btn.TextSize = 15
+            btn.LayoutOrder = self.elementCount -- Fixes order
             Instance.new("UICorner", btn)
             btn.MouseButton1Click:Connect(callback)
         end
 
         function tabObj:addSlider(text, min, max, default, callback)
+            self.elementCount = self.elementCount + 1
             local frame = Instance.new("Frame", page)
             frame.Size = UDim2.new(1, -10, 0, 60)
             frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+            frame.LayoutOrder = self.elementCount -- Fixes order
             Instance.new("UICorner", frame)
             
             local label = Instance.new("TextLabel", frame)
@@ -162,7 +169,6 @@ function mod.init(titleText)
             fill.BorderSizePixel = 0
             Instance.new("UICorner", fill)
             
-            -- Store value globally for config saving
             currentSettings[text] = default
 
             bar.InputBegan:Connect(function(input)
@@ -185,8 +191,7 @@ function mod.init(titleText)
                     end)
                 end
             end)
-            
-            -- Return an internal function to manually set value during loading
+
             function tabObj:updateSlider(targetText, newVal)
                 if targetText == text then
                     local p = math.clamp((newVal - min) / (max - min), 0, 1)
@@ -199,6 +204,7 @@ function mod.init(titleText)
         end
 
         function tabObj:addInput(placeholder, callback)
+            self.elementCount = self.elementCount + 1
             local box = Instance.new("TextBox", page)
             box.Size = UDim2.new(1, -10, 0, 42)
             box.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
@@ -208,6 +214,7 @@ function mod.init(titleText)
             box.TextColor3 = Color3.new(1,1,1)
             box.Font = Enum.Font.GothamMedium
             box.TextSize = 15
+            box.LayoutOrder = self.elementCount -- Fixes order
             Instance.new("UICorner", box)
             box.FocusLost:Connect(function(enter) if enter then callback(box.Text) end end)
             return box
