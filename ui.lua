@@ -53,7 +53,7 @@ mod.init = function(title, blur)
 	screenGui.Name = title
 	screenGui.Parent = playerGui
 
-	local panel = rect(0, 0, 175, 325, 0, screenGui)
+	local panel = rect(-(175 / 2), -(325 / 2), 175, 325, 0, screenGui)
 	text(title, 0, 10, 175, 30, nil, 16, Color3.fromRGB(255, 255, 255), panel, true).TextScaled = true
 	
 	return screenGui
