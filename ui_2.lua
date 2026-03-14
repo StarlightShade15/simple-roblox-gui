@@ -8,6 +8,7 @@
 --
 --   Neverlose-Style Premium UI Library
 --   Single-file, self-contained framework
+--   (Fixed dropdown Z‑index & clipping)
 --
 --   Usage:
 --     local UI = loadstring(game:HttpGet("https://example.com/UILibrary.lua"))()
@@ -216,6 +217,15 @@ do
     ScreenGui = sg
 end
 
+-- ──────────────────── Popup Container (for dropdowns etc.) ─
+local PopupContainer = New("Frame", {
+    Name = "PopupContainer",
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1,
+    ZIndex = 1000,
+    Parent = ScreenGui,
+})
+
 -- ──────────────────── Notification Container ──────────────
 local NotifHolder = New("Frame", {
     Name                = "NotifHolder",
@@ -414,7 +424,6 @@ end
 
 -- ──────────────────── Add Custom Theme ────────────────────
 function Library:AddTheme(name, data)
-    -- Merge defaults from Dark theme so partial defs work
     local base = {}
     for k, v in pairs(self.Themes.Dark) do base[k] = v end
     for k, v in pairs(data) do base[k] = v end
@@ -1145,7 +1154,7 @@ function Library:CreateWindow(opts)
             end
 
             -- ══════════════════════════════════════════════
-            --  DROPDOWN
+            --  DROPDOWN (FIXED: popup in PopupContainer, absolute positioning)
             -- ══════════════════════════════════════════════
             function GB:CreateDropdown(opts)
                 local n       = opts.Name    or "Dropdown"
@@ -1217,17 +1226,16 @@ function Library:CreateWindow(opts)
                     Parent              = dropBtn,
                 })
 
-                local isOpen   = false
+                -- Popup list (now parented to PopupContainer)
                 local dropList = New("Frame", {
                     Name             = "DropList",
-                    Size             = UDim2.new(1, 0, 0, 0),
-                    Position         = UDim2.new(0, 0, 1, 4),
+                    Size             = UDim2.new(0, dropBtn.AbsoluteSize.X, 0, 0), -- width set later
                     BackgroundColor3 = theme.Secondary,
                     BorderSizePixel  = 0,
                     Visible          = false,
                     ClipsDescendants = true,
-                    ZIndex           = 20,
-                    Parent           = dropBtn,
+                    ZIndex           = 1001,          -- high ZIndex
+                    Parent           = PopupContainer,
                 })
                 Corner(dropList, 6)
                 Stroke(dropList, theme.Outline)
@@ -1235,6 +1243,8 @@ function Library:CreateWindow(opts)
                 ListLayout(dropList, 2)
 
                 local Ref = {}
+                local isOpen = false
+                local updateConn = nil
 
                 local function SetSelected(opt, silent)
                     selected = opt
@@ -1258,7 +1268,7 @@ function Library:CreateWindow(opts)
                             TextColor3          = isSelected and T().Text or T().SubText,
                             Font                = Library.Font,
                             TextSize            = 12,
-                            ZIndex              = 21,
+                            ZIndex              = 1002,
                             Parent              = dropList,
                         })
                         Corner(item, 4)
@@ -1266,8 +1276,10 @@ function Library:CreateWindow(opts)
                         item.MouseLeave:Connect(function() Tween(item, { BackgroundTransparency = (opt == selected) and 0 or 1 }, 0.08) end)
                         item.MouseButton1Click:Connect(function()
                             SetSelected(opt)
+                            -- Close dropdown
                             isOpen = false
-                            Tween(dropList, { Size = UDim2.new(1, 0, 0, 0) }, 0.14)
+                            if updateConn then updateConn:Disconnect(); updateConn = nil end
+                            Tween(dropList, { Size = UDim2.new(0, dropBtn.AbsoluteSize.X, 0, 0) }, 0.14)
                             task.delay(0.14, function() dropList.Visible = false end)
                             RebuildList()
                         end)
@@ -1275,12 +1287,29 @@ function Library:CreateWindow(opts)
                 end
                 RebuildList()
 
+                local function updatePopupPosition()
+                    if not dropBtn or not dropBtn.Visible then return end
+                    local absPos = dropBtn.AbsolutePosition
+                    local absSize = dropBtn.AbsoluteSize
+                    dropList.Position = UDim2.fromOffset(absPos.X, absPos.Y + absSize.Y + 4)
+                    -- also update width in case button resized
+                    dropList.Size = UDim2.new(0, absSize.X, 0, dropList.AbsoluteSize.Y)
+                end
+
                 dropBtn.MouseButton1Click:Connect(function()
                     isOpen = not isOpen
-                    dropList.Visible = true
-                    local h = #options * 28 + 8
-                    Tween(dropList, { Size = isOpen and UDim2.new(1, 0, 0, h) or UDim2.new(1, 0, 0, 0) }, 0.15)
-                    if not isOpen then task.delay(0.15, function() dropList.Visible = false end) end
+                    if isOpen then
+                        -- Update position and start tracking
+                        updatePopupPosition()
+                        updateConn = RunService.RenderStepped:Connect(updatePopupPosition)
+                        dropList.Visible = true
+                        local h = #options * 28 + 8
+                        Tween(dropList, { Size = UDim2.new(0, dropBtn.AbsoluteSize.X, 0, h) }, 0.15)
+                    else
+                        if updateConn then updateConn:Disconnect(); updateConn = nil end
+                        Tween(dropList, { Size = UDim2.new(0, dropBtn.AbsoluteSize.X, 0, 0) }, 0.15)
+                        task.delay(0.15, function() dropList.Visible = false end)
+                    end
                 end)
 
                 RegisterListener(function(t)
@@ -1301,7 +1330,7 @@ function Library:CreateWindow(opts)
             end
 
             -- ══════════════════════════════════════════════
-            --  MULTI-DROPDOWN
+            --  MULTI-DROPDOWN (FIXED)
             -- ══════════════════════════════════════════════
             function GB:CreateMultiDropdown(opts)
                 local n       = opts.Name    or "MultiSelect"
@@ -1378,16 +1407,15 @@ function Library:CreateWindow(opts)
                     ZIndex = 6, Parent = dropBtn,
                 })
 
-                local isOpen   = false
+                -- Popup list (now in PopupContainer)
                 local dropList = New("Frame", {
-                    Size             = UDim2.new(1, 0, 0, 0),
-                    Position         = UDim2.new(0, 0, 1, 4),
+                    Size             = UDim2.new(0, dropBtn.AbsoluteSize.X, 0, 0),
                     BackgroundColor3 = theme.Secondary,
                     BorderSizePixel  = 0,
                     Visible          = false,
                     ClipsDescendants = true,
-                    ZIndex           = 20,
-                    Parent           = dropBtn,
+                    ZIndex           = 1001,
+                    Parent           = PopupContainer,
                 })
                 Corner(dropList, 6)
                 Stroke(dropList, theme.Outline)
@@ -1395,6 +1423,8 @@ function Library:CreateWindow(opts)
                 ListLayout(dropList, 2)
 
                 local Ref = {}
+                local isOpen = false
+                local updateConn = nil
 
                 local function RebuildMultiList()
                     for _, c in ipairs(dropList:GetChildren()) do
@@ -1407,7 +1437,7 @@ function Library:CreateWindow(opts)
                             BackgroundColor3    = isSel and T().Accent or T().Tertiary,
                             BackgroundTransparency = isSel and 0 or 1,
                             BorderSizePixel     = 0,
-                            ZIndex              = 21,
+                            ZIndex              = 1002,
                             Parent              = dropList,
                         })
                         Corner(item, 4)
@@ -1415,17 +1445,17 @@ function Library:CreateWindow(opts)
                             Size = UDim2.new(1, -28, 1, 0), Position = UDim2.new(0, 8, 0, 0),
                             BackgroundTransparency = 1, Text = opt,
                             TextColor3 = T().Text, Font = Library.Font, TextSize = 12,
-                            ZIndex = 22, Parent = item,
+                            ZIndex = 1003, Parent = item,
                         })
                         local chk = New("TextLabel", {
                             Size = UDim2.new(0, 18, 1, 0), Position = UDim2.new(1, -22, 0, 0),
                             BackgroundTransparency = 1, Text = isSel and "✓" or "",
                             TextColor3 = Color3.fromRGB(255,255,255), Font = Enum.Font.GothamBold,
-                            TextSize = 12, ZIndex = 22, Parent = item,
+                            TextSize = 12, ZIndex = 1003, Parent = item,
                         })
                         New("TextButton", {
                             Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1,
-                            Text = "", ZIndex = 23, Parent = item,
+                            Text = "", ZIndex = 1004, Parent = item,
                         }).MouseButton1Click:Connect(function()
                             selected[opt] = not selected[opt]
                             selLbl.Text = SelText()
@@ -1439,12 +1469,27 @@ function Library:CreateWindow(opts)
                 end
                 RebuildMultiList()
 
+                local function updatePopupPosition()
+                    if not dropBtn or not dropBtn.Visible then return end
+                    local absPos = dropBtn.AbsolutePosition
+                    local absSize = dropBtn.AbsoluteSize
+                    dropList.Position = UDim2.fromOffset(absPos.X, absPos.Y + absSize.Y + 4)
+                    dropList.Size = UDim2.new(0, absSize.X, 0, dropList.AbsoluteSize.Y)
+                end
+
                 dropBtn.MouseButton1Click:Connect(function()
                     isOpen = not isOpen
-                    dropList.Visible = true
-                    local h = #options * 28 + 8
-                    Tween(dropList, { Size = isOpen and UDim2.new(1,0,0,h) or UDim2.new(1,0,0,0) }, 0.15)
-                    if not isOpen then task.delay(0.15, function() dropList.Visible = false end) end
+                    if isOpen then
+                        updatePopupPosition()
+                        updateConn = RunService.RenderStepped:Connect(updatePopupPosition)
+                        dropList.Visible = true
+                        local h = #options * 28 + 8
+                        Tween(dropList, { Size = UDim2.new(0, dropBtn.AbsoluteSize.X, 0, h) }, 0.15)
+                    else
+                        if updateConn then updateConn:Disconnect(); updateConn = nil end
+                        Tween(dropList, { Size = UDim2.new(0, dropBtn.AbsoluteSize.X, 0, 0) }, 0.15)
+                        task.delay(0.15, function() dropList.Visible = false end)
+                    end
                 end)
 
                 RegisterListener(function(t) dropBtn.BackgroundColor3 = t.Secondary; selLbl.TextColor3 = t.Text end)
@@ -1544,7 +1589,7 @@ function Library:CreateWindow(opts)
             end
 
             -- ══════════════════════════════════════════════
-            --  COLOR PICKER
+            --  COLOR PICKER (FIXED)
             -- ══════════════════════════════════════════════
             function GB:CreateColorPicker(opts)
                 local n       = opts.Name     or "Color"
@@ -1574,15 +1619,14 @@ function Library:CreateWindow(opts)
                 Corner(preview, 4)
                 Stroke(preview, theme.Outline)
 
-                -- ── Picker Popup ──
+                -- ── Picker Popup (now in PopupContainer) ──
                 local popup = New("Frame", {
                     Size             = UDim2.new(0, 196, 0, 158),
-                    Position         = UDim2.new(0, 56, 1, 4),
                     BackgroundColor3 = theme.Secondary,
                     BorderSizePixel  = 0,
                     Visible          = false,
-                    ZIndex           = 30,
-                    Parent           = row,
+                    ZIndex           = 1001,
+                    Parent           = PopupContainer,
                 })
                 Corner(popup, 8)
                 Stroke(popup, theme.Outline)
@@ -1592,7 +1636,7 @@ function Library:CreateWindow(opts)
                 local hueBar = New("Frame", {
                     Size = UDim2.new(1, 0, 0, 12),
                     Position = UDim2.new(0, 0, 0, 0),
-                    BorderSizePixel = 0, ZIndex = 31, Parent = popup,
+                    BorderSizePixel = 0, ZIndex = 1002, Parent = popup,
                 })
                 Corner(hueBar, 4)
                 local hg = New("UIGradient", { Parent = hueBar })
@@ -1610,7 +1654,7 @@ function Library:CreateWindow(opts)
                     Size = UDim2.new(0, 4, 1, 0),
                     Position = UDim2.new(h, -2, 0, 0),
                     BackgroundColor3 = Color3.fromRGB(255,255,255),
-                    BorderSizePixel = 0, ZIndex = 32, Parent = hueBar,
+                    BorderSizePixel = 0, ZIndex = 1003, Parent = hueBar,
                 })
                 Corner(hueCursor, 2)
 
@@ -1619,7 +1663,7 @@ function Library:CreateWindow(opts)
                     Size = UDim2.new(1, 0, 0, 96),
                     Position = UDim2.new(0, 0, 0, 20),
                     BackgroundColor3 = Color3.fromHSV(h, 1, 1),
-                    BorderSizePixel = 0, ZIndex = 31, Parent = popup,
+                    BorderSizePixel = 0, ZIndex = 1002, Parent = popup,
                 })
                 Corner(svBox, 4)
                 New("UIGradient", {
@@ -1629,7 +1673,7 @@ function Library:CreateWindow(opts)
                 })
                 local blackOverlay = New("Frame", {
                     Size = UDim2.new(1,0,1,0), BackgroundColor3 = Color3.fromRGB(0,0,0),
-                    BorderSizePixel = 0, ZIndex = 32, Parent = svBox,
+                    BorderSizePixel = 0, ZIndex = 1003, Parent = svBox,
                 })
                 Corner(blackOverlay, 4)
                 New("UIGradient", {
@@ -1641,7 +1685,7 @@ function Library:CreateWindow(opts)
                     Size = UDim2.new(0, 10, 0, 10),
                     Position = UDim2.new(s, -5, 1-v, -5),
                     BackgroundColor3 = Color3.fromRGB(255,255,255),
-                    BorderSizePixel = 1, ZIndex = 33, Parent = svBox,
+                    BorderSizePixel = 1, ZIndex = 1004, Parent = svBox,
                 })
                 Corner(svKnob, 5)
 
@@ -1654,7 +1698,7 @@ function Library:CreateWindow(opts)
                     Text = string.format("#%02X%02X%02X", math.round(color.R*255), math.round(color.G*255), math.round(color.B*255)),
                     TextColor3 = theme.Text, Font = Enum.Font.Code, TextSize = 11,
                     TextXAlignment = Enum.TextXAlignment.Center,
-                    ClearTextOnFocus = false, ZIndex = 32, Parent = popup,
+                    ClearTextOnFocus = false, ZIndex = 1003, Parent = popup,
                 })
                 Corner(hexInput, 4)
 
@@ -1717,9 +1761,25 @@ function Library:CreateWindow(opts)
                 end)
 
                 local pickerOpen = false
+                local updateConn = nil
+
+                local function updatePopupPosition()
+                    if not preview or not preview.Visible then return end
+                    local absPos = preview.AbsolutePosition
+                    local absSize = preview.AbsoluteSize
+                    popup.Position = UDim2.fromOffset(absPos.X + absSize.X + 4, absPos.Y)
+                end
+
                 preview.MouseButton1Click:Connect(function()
                     pickerOpen = not pickerOpen
-                    popup.Visible = pickerOpen
+                    if pickerOpen then
+                        updatePopupPosition()
+                        updateConn = RunService.RenderStepped:Connect(updatePopupPosition)
+                        popup.Visible = true
+                    else
+                        if updateConn then updateConn:Disconnect(); updateConn = nil end
+                        popup.Visible = false
+                    end
                 end)
 
                 RegisterListener(function(t)
