@@ -743,7 +743,7 @@ function Window.create(opts)
                 return Ref
             end
 
-            -- Dropdown
+            -- Dropdown (with proper PopupContainer creation)
             function GB:CreateDropdown(opts)
                 local n = opts.Name or "Dropdown"
                 local options = opts.Options or {}
@@ -754,6 +754,18 @@ function Window.create(opts)
 
                 local selected = default
                 if flag then LibraryRef.Flags[flag] = selected end
+
+                -- Ensure PopupContainer exists
+                local PopupContainer = ScreenGui:FindFirstChild("PopupContainer")
+                if not PopupContainer then
+                    PopupContainer = UtilsRef.New("Frame", {
+                        Name = "PopupContainer",
+                        Size = UDim2.new(1, 0, 1, 0),
+                        BackgroundTransparency = 1,
+                        ZIndex = POPUP_Z_INDEX,
+                        Parent = ScreenGui,
+                    })
+                end
 
                 local row = UtilsRef.New("Frame", {
                     Size = UDim2.new(1, 0, 0, 52),
@@ -821,10 +833,7 @@ function Window.create(opts)
                     Visible = false,
                     ClipsDescendants = true,
                     ZIndex = POPUP_Z_INDEX + 1,
-                    Parent = ScreenGui:FindFirstChild("PopupContainer") or (function()
-                        local pc = UtilsRef.New("Frame", { Name = "PopupContainer", Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, ZIndex = POPUP_Z_INDEX, Parent = ScreenGui })
-                        return pc
-                    end)(),
+                    Parent = PopupContainer,
                 })
                 UtilsRef.Corner(dropList, 6, LibraryRef)
                 UtilsRef.Stroke(dropList, ThemeManager.getCurrent().Outline)
@@ -954,7 +963,7 @@ function Window.create(opts)
                 return Ref
             end
 
-            -- MultiDropdown
+            -- MultiDropdown (similar fix for PopupContainer)
             function GB:CreateMultiDropdown(opts)
                 local n = opts.Name or "MultiSelect"
                 local options = opts.Options or {}
@@ -966,6 +975,17 @@ function Window.create(opts)
                 local selected = {}
                 for _, v in ipairs(default) do selected[v] = true end
                 if flag then LibraryRef.Flags[flag] = selected end
+
+                local PopupContainer = ScreenGui:FindFirstChild("PopupContainer")
+                if not PopupContainer then
+                    PopupContainer = UtilsRef.New("Frame", {
+                        Name = "PopupContainer",
+                        Size = UDim2.new(1, 0, 1, 0),
+                        BackgroundTransparency = 1,
+                        ZIndex = POPUP_Z_INDEX,
+                        Parent = ScreenGui,
+                    })
+                end
 
                 local row = UtilsRef.New("Frame", {
                     Size = UDim2.new(1, 0, 0, 52),
@@ -1040,10 +1060,7 @@ function Window.create(opts)
                     Visible = false,
                     ClipsDescendants = true,
                     ZIndex = POPUP_Z_INDEX + 1,
-                    Parent = ScreenGui:FindFirstChild("PopupContainer") or (function()
-                        local pc = UtilsRef.New("Frame", { Name = "PopupContainer", Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, ZIndex = POPUP_Z_INDEX, Parent = ScreenGui })
-                        return pc
-                    end)(),
+                    Parent = PopupContainer,
                 })
                 UtilsRef.Corner(dropList, 6, LibraryRef)
                 UtilsRef.Stroke(dropList, ThemeManager.getCurrent().Outline)
@@ -1268,49 +1285,6 @@ function Window.create(opts)
                 local Ref = {}
                 function Ref:Set(v) tb.Text = v; value = v end
                 function Ref:Get() return value end
-                function Ref:Dependency(toggleRef, requireVal)
-                    local conn
-                    local function Upd()
-                        if not row then conn:Disconnect() return end
-                        row.Visible = (toggleRef:Get() == requireVal)
-                    end
-                    conn = RunService.Heartbeat:Connect(Upd)
-                    Upd()
-                end
-                return Ref
-            end
-
-            -- ColorPicker (simplified – full version can be added similarly)
-            function GB:CreateColorPicker(opts)
-                local n = opts.Name or "Color"
-                local default = opts.Default or Color3.fromRGB(255, 80, 80)
-                local flag = opts.Flag
-                local cb = opts.Callback or function() end
-                local tooltipText = opts.Tooltip
-
-                local color = default
-                if flag then LibraryRef.Flags[flag] = color end
-
-                local row, _ = ElemRow(n, 26, tooltipText)
-                row.ClipsDescendants = false
-                row.ZIndex = 5
-
-                local preview = UtilsRef.New("TextButton", {
-                    Size = UDim2.new(0, 52, 0, 20),
-                    Position = UDim2.new(1, -52, 0.5, -10),
-                    BackgroundColor3 = color,
-                    BorderSizePixel = 0,
-                    Text = "",
-                    ZIndex = 6,
-                    Parent = row,
-                })
-                UtilsRef.Corner(preview, 4, LibraryRef)
-                UtilsRef.Stroke(preview, ThemeManager.getCurrent().Outline)
-
-                -- Placeholder: color picker popup omitted for brevity; add full implementation if needed
-                local Ref = {}
-                function Ref:Set(c) color = c; preview.BackgroundColor3 = c end
-                function Ref:Get() return color end
                 function Ref:Dependency(toggleRef, requireVal)
                     local conn
                     local function Upd()
