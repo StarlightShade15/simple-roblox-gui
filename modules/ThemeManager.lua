@@ -79,9 +79,7 @@ local Themes = {
         Element = Color3.fromRGB(9, 22, 15),
         Scrollbar = Color3.fromRGB(25, 70, 48),
     },
-}
-
-local LibraryRef = nil
+}local LibraryRef = nil
 local UtilsRef = nil
 
 function ThemeManager.init(library, utils)
