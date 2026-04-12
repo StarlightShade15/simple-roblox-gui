@@ -1,15 +1,5 @@
 -- ============================================================
---  _   _                     _                    
--- | \ | |                   | |                   
--- |  \| | _____   _____ _ __| |     ___  ___  ___ 
--- | . ` |/ _ \ \ / / _ \ '__| |    / _ \/ __|/ _ \
--- | |\  |  __/\ V /  __/ |  | |___| (_) \__ \  __/
--- \_| \_/\___| \_/ \___|_|  \_____/\___/|___/\___|
-                                                
-                                                
---
---   Neverlose-Style Premium UI Library
---   Modular version (fixed & cleaned)
+--   Neverlose-Style Premium UI Library (Modular, Fixed)
 -- ============================================================
 
 local Library = {}
@@ -29,9 +19,6 @@ local DEFAULT_CORNER_RADIUS = 6
 local DEFAULT_FONT = Enum.Font.GothamMedium
 local POPUP_Z_INDEX = 1000
 local TOOLTIP_Z_INDEX = 9999
-local ANIMATION_TIME = 0.15
-local EASING_STYLE = Enum.EasingStyle.Quad
-local EASING_DIR = Enum.EasingDirection.Out
 
 -- State
 Library.CurrentTheme = "Dark"
@@ -47,15 +34,15 @@ Library._themeListeners = {}
 Library._tooltipConnection = nil
 
 -- Import modules
-local Utils = require(script.Parent.modules.Utils)
-local ThemeManager = require(script.Parent.modules.ThemeManager)
-local Tooltip = require(script.Parent.modules.Tooltip)
-local Notification = require(script.Parent.modules.Notification)
-local Watermark = require(script.Parent.modules.Watermark)
-local ConfigManager = require(script.Parent.modules.ConfigManager)
-local Window = require(script.Parent.modules.Window)
+local Utils = require(script.modules.Utils)
+local ThemeManager = require(script.modules.ThemeManager)
+local Tooltip = require(script.modules.Tooltip)
+local Notification = require(script.modules.Notification)
+local Watermark = require(script.modules.Watermark)
+local ConfigManager = require(script.modules.ConfigManager)
+local Window = require(script.modules.Window)
 
--- Inject dependencies into modules
+-- Inject dependencies
 ThemeManager.init(Library, Utils)
 Tooltip.init(Library, Utils, UserInputService, TextService, TOOLTIP_Z_INDEX)
 Notification.init(Library, Utils)
@@ -103,7 +90,6 @@ function Library:CreateWindow(opts)
 end
 
 function Library:Destroy()
-    -- Cleanup all windows and connections
     for _, win in ipairs(self._windows) do
         win:Close()
     end
